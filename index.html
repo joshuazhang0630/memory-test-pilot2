@@ -5,121 +5,310 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory Test - Scientific Visualization</title>
     <style>
+        :root {
+            --scarlet: #BB0000;
+            --scarlet-dark: #990000;
+            --dark-gray: #2C2C2C;
+            --mid-gray: #666666;
+            --light-gray: #F5F5F5;
+            --card-border: #E0E0E0;
+            --white: #FFFFFF;
+            --success: #2E7D32;
+            --error: #C62828;
+            --warning: #F57C00;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
+            font-family: "Open Sans", Arial, Helvetica, sans-serif;
+            background-color: var(--light-gray);
+            color: var(--mid-gray);
             margin: 0;
-            padding: 20px;
+            min-height: 100vh;
         }
-        .feedback-overlay {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            padding: 30px 50px;
-            border-radius: 15px;
-            font-size: 24px;
-            font-weight: bold;
-            z-index: 10000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            animation: fadeInOut 1s ease-in-out;
-        }
-        .feedback-correct {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .feedback-miss {
-            background-color: #f44336;
-            color: white;
-        }
-        .feedback-false-alarm {
-            background-color: #ff9800;
-            color: white;
-        }
-        @keyframes fadeInOut {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-        }
-        .instruction-page {
-            max-width: 800px;
-            margin: 50px auto;
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .instruction-page h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        .instruction-page p {
-            font-size: 18px;
-            line-height: 1.8;
-            color: #555;
-            margin-bottom: 15px;
-        }
-        .instruction-page ul {
-            font-size: 18px;
-            line-height: 2;
-            color: #555;
-            margin-left: 20px;
-        }
-        .instruction-page strong {
-            color: #2196F3;
-        }
-        .btn-large {
-            background-color: #2196F3;
-            color: white;
-            border: none;
-            padding: 15px 40px;
-            font-size: 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        .btn-large:hover {
-            background-color: #1976D2;
-        }
-        .pretrain-result {
-            max-width: 700px;
-            margin: 50px auto;
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .pretrain-result h2 {
-            color: #4CAF50;
-            margin-bottom: 30px;
-        }
-        .stats-box {
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        .stats-box p {
-            font-size: 20px;
-            margin: 10px 0;
-            color: #333;
-        }
-        .tips-box {
-            background: #e3f2fd;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            text-align: left;
-        }
-        .tips-box h3 {
-            color: #1976D2;
+
+        h1, h2, h3 {
+            font-family: "Roboto Slab", Georgia, "Times New Roman", serif;
+            color: var(--dark-gray);
             margin-top: 0;
         }
-        .tips-box ul {
-            color: #555;
-            line-height: 1.8;
+
+        .osu-banner {
+            background-color: var(--scarlet);
+            color: var(--white);
+            padding: 18px 24px;
+            text-align: center;
+            font-family: "Roboto Slab", Georgia, serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .osu-lockup {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .osu-logo-mark {
+            border: 2px solid var(--white);
+            border-radius: 3px;
+            font-size: 24px;
+            padding: 6px 14px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .osu-title {
+            font-size: 20px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .osu-subtitle {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .main-shell {
+            max-width: 960px;
+            margin: 40px auto;
+            padding: 0 20px 60px;
+        }
+
+        .card {
+            background-color: var(--white);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 32px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+        }
+
+        .section-title {
+            font-size: 34px;
+            margin-bottom: 16px;
+        }
+
+        .lead-text {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .instruction-list {
+            padding-left: 20px;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .instruction-list li {
+            margin-bottom: 12px;
+        }
+
+        .primary-button {
+            background-color: var(--scarlet);
+            color: var(--white);
+            border: none;
+            padding: 12px 40px;
+            border-radius: 4px;
+            font-size: 18px;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+            transition: background-color 0.2s ease;
+        }
+
+        .primary-button:hover,
+        .primary-button:focus {
+            background-color: var(--scarlet-dark);
+        }
+
+        .mark-button {
+            background-color: transparent;
+            color: var(--scarlet);
+            border: 2px solid var(--scarlet);
+            padding: 10px 28px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .mark-button:hover,
+        .mark-button:focus {
+            background-color: rgba(187,0,0,0.08);
+        }
+
+        .stimulus-panel {
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 24px;
+            background-color: var(--white);
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        .action-row {
+            display: flex;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .stimulus-frame {
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            min-height: 360px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--light-gray);
+            margin-top: 16px;
+        }
+
+        #stimulus {
+            max-width: 380px;
+            max-height: 340px;
+        }
+
+        .instruction-callout {
+            font-size: 16px;
+            color: var(--dark-gray);
+            margin-bottom: 8px;
+        }
+
+        .muted-text {
+            color: var(--mid-gray);
+            font-size: 14px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background-color: #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: var(--scarlet);
+            transition: width 0.3s ease;
+        }
+
+        .progress-label {
+            font-size: 14px;
+            color: var(--mid-gray);
+            margin-bottom: 16px;
+        }
+
+        .feedback-overlay {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            min-width: 240px;
+            padding: 16px 20px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,0,0,0.1);
+            color: var(--white);
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            animation: subtleFade 1.1s ease-out;
+            z-index: 1000;
+        }
+
+        .feedback-overlay .feedback-icon {
+            font-size: 18px;
+        }
+
+        .feedback-correct { background-color: var(--success); }
+        .feedback-miss { background-color: var(--error); }
+        .feedback-false-alarm { background-color: var(--warning); color: var(--dark-gray); }
+
+        @keyframes subtleFade {
+            0% { opacity: 0; transform: translateY(-10px); }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .stat-item {
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--mid-gray);
+        }
+
+        .stat-value {
+            font-size: 26px;
+            color: var(--dark-gray);
+            margin-top: 8px;
+        }
+
+        .irb-note {
+            font-size: 14px;
+            color: var(--mid-gray);
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        #splash {
+            background-color: var(--light-gray);
+        }
+
+        .splash-wrapper {
+            min-height: calc(100vh - 40px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px 60px;
+        }
+
+        .splash-card {
+            width: 100%;
+            max-width: 520px;
+            text-align: left;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            font-size: 16px;
+            margin: 12px 0 20px;
         }
     </style>
 </head>
@@ -128,7 +317,85 @@
 <!--- Start the Javascript that does all the hard work! --->
 <script type="text/javascript" charset="UTF-8">
 
-/* Modified to include pretrain functionality */
+/* prolific edition
+- changed the image set from default to mixed visimages
+- modified some variables to suit this experiment better
+- added code to feed data into a google sheet via apps script
+- added a new mark button to support mobile use
+- fixed not allowing continuation upon pressing C while on break
+- added splash screens for starting and ending the experiment
+- multiple bug fixes
+
+*************** Script by Wilma A. Bainbridge, 2016 ***********************
+
+Updated August 26, 2020: Minor updates:
+- Now records responses during fixation
+- Fixed bug not showing "goodbye" message
+- Uses different (more stable) variable to determine experiment trial length
+- Participants now have to press "R" to begin, to ensure correct window focus
+----------------------
+
+This script was generated to help you run your memorability experiment based on the parameters you want. I hope this is useful to you! If you use the memorability scores or this script in any of your work, please cite: 
+
+***
+
+I've streamlined how the experiments are run here in comparison to the original Isola et al., 2011 study. This means there are some differences for the sake of making this easier to handle. Major differences include:
+
+- Participants can no longer pause, exit, and start again later (since you'd need to maintain a database of their information somewhere!)
+- Breaks are fixed time - participants currently can't continue on their own (because of how Javascript's setTimeout works)
+- There is no more practice run. Feel free to make a mini experiment to use as a practice run.
+- There is no feedback for button presses.
+
+The output you will get are four variables:
+ 1. imseq: The order of image files shown to participants. Make sure you have no duplicate file names!! (Even if they're in different directories.)
+ 2. imtypeseq: The order of trial types.
+ 		0 = Fixation trial
+ 		1 = First presentation of a target image
+ 		2 = Second presentation (target repeat) of a target image
+ 		3 = First presentation of a filler image
+ 		4 = Second presentation (vigilance repeat) of a filler image
+ 3. perfseq: The order of participant behavior for each trial.
+ 		11 = hit
+ 		12 = miss
+ 		13 = false alarm
+ 		14 = correct rejection
+ 4. ending: Where the participant ended the study. If they finished, it will be set to "completed". If they failed, it will be set to "failed@" and the percentage of trials completed. If they stopped in the middle, it will be blank (but you will know the number of trials completed by the other variables).
+ 
+One thing to keep in mind is that the most complex part of this script is optimizing the number of targets, fillers, timing, etc to maximize number of memorability scores and minimize the cost of the experiment. I have a beginning formula here that will give a good estimate but there may be more complicated designs you could imagine implementing (for example, adding more vigilance repeats or more target repeats dynamically and intelligently if there are not enough fillers). Feel free to try your hand at this -- you could even hard-code the image sequence yourself here instead of having it automatically calculated if you want complete control over everything!
+
+Also keep in mind that these scripts don't necessarily account for human error. You may need to get more hits than the # calculated because people will often fail / quit in the middle.
+
+Lastly, this script can be used as-is with Amazon Mechanical Turk, but you will have to implement your own server-side saving mechanism if you want to host it on your own website. The main values to save in the database can be find in the hidden input tags near the end of this script. If you'd like a tutorial on this, contact me and I'll write one up for people to use.
+
+Let me know if you'd like anything added / changed: brainbridgelab@gmail.com. I will not be very actively updating these scripts, but if I get enough requests for a feature or change, I will likely implement it!
+
+Additional 2024 updates:
+- Added modern splash, instruction, and practice flow with pretrain functionality
+- Added inline performance feedback overlays
+- Modernized styling and mobile-friendly controls while keeping Bainbridge core logic intact
+*/
+
+function osuBanner() {
+    return `
+        <header class="osu-banner">
+            <div class="osu-lockup">
+                <div>
+                    <div class="osu-title">The Ohio State University</div>
+                    <div class="osu-subtitle">Computer Vision & Visualization Laboratory</div>
+                </div>
+            </div>
+        </header>
+    `;
+}
+
+function renderShell(content) {
+    return `
+        ${osuBanner()}
+        <main class="main-shell">
+            ${content}
+        </main>
+    `;
+}
 
 // parameters set by the experimenter
 var fixation_address = "http://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
@@ -147,8 +414,8 @@ var timeBetweenBreaks = 300; // in seconds
 var maxBreakTime = 15; // in seconds 
 
 // text set by the experimenter
-var failuretext = "<h2>Finished!</h2>Unfortunately you made too many errors and the game has ended. Press the <b>SUBMIT HIT</b> button to get credit for the hit.<br>";
-var donetext = "<h2>Finished!</h2>You have finished the task - great job! Press the <b>SUBMIT HIT</b> button to get credit for the hit.<br>";
+var failuretext = "<h2 class='section-title'>Session Halted</h2><p>You exceeded the permitted error rate. Please submit the session to record participation.</p>";
+var donetext = "<h2 class='section-title'>Session Complete</h2><p>Thank you for your diligence. You may now submit the session for credit.</p>";
 
 // Pretrain variables
 var pretrainImages = []; // Will store indices of images used for pretrain
@@ -299,67 +566,61 @@ function buildPretrainSequence() {
 
 // Show instruction page
 function showInstructions() {
-    document.body.innerHTML = `
-        <div class="instruction-page">
-            <h2>Welcome to the Visual Memory Test!</h2>
-            <p>In this experiment, you will see a stream of scientific visualization images. Your task is simple:</p>
-            <ul>
-                <li><strong>Watch each image carefully</strong> as it appears for 1 second</li>
-                <li><strong>Press the SPACE key</strong> (or click the MARK button) immediately when you see an image that you have seen before</li>
-                <li>Between images, you will see a <strong>+ symbol</strong> - do not press anything during this time</li>
-            </ul>
-            <p><strong>Important:</strong></p>
-            <ul>
-                <li>Some images will repeat after a while - that's when you should press!</li>
-                <li>Pay close attention - repeated images may look very similar to others</li>
-                <li>It's okay to make mistakes during practice</li>
-            </ul>
-            <p>Let's start with a short <strong>practice round</strong> to help you get familiar with the task.</p>
-            <center>
-                <button class="btn-large" onclick="startPretrain()">Start Practice</button>
-            </center>
-        </div>
+    var content = `
+        <section class="card">
+            <h1 class="section-title">Visual Memorability Study</h1>
+            <p class="lead-text">
+                Thank you for contributing to the Computer Visualization Lab at The Ohio State University.
+                During this study you will evaluate visualizations and indicate when an image repeats.
+            </p>
+            <ol class="instruction-list">
+                <li><strong>Attend carefully.</strong> Each visualization will appear 1 second followed by a fixation interval.</li>
+                <li><strong>Respond only to repeats.</strong> Press the <strong>SPACE BAR</strong> or use the on-screen mark control when you recognize a repeated image.</li>
+            </ol>
+            <p class="lead-text">
+                We will begin with a short practice to ensure the procedure is clear.
+                Results are not recorded during practice.
+            </p>
+            <div class="action-row">
+                <button class="primary-button" onclick="startPretrain()">Begin Practice</button>
+            </div>
+        </section>
     `;
+    document.body.innerHTML = renderShell(content);
 }
 
 // Start pretrain
 function startPretrain() {
-    inPretrainMode = true;
-    pretrainImCount = -1;
-    
+	inPretrainMode = true;
+	pretrainImCount = -1;
+	
     // Reset counters
     pretrainHits = 0;
     pretrainMisses = 0;
     pretrainFalseAlarms = 0;
     pretrainCorrectRejections = 0;
     
-    // Show the main interface
-    document.body.innerHTML = `
-        <form id="form" autocomplete="off">
-        <input type = "hidden" name = "imseq" id = "imseqout" value = "">
-        <input type = "hidden" name = "imtypeseq" id = "imtypeseqout" value = "">
-        <input type = "hidden" name = "perfseq" id = "perfseqout" value = "">
-        <input type = "hidden" name = "ending" id = "endingout" value = "">
-
-        <center>
-        <h1>Practice Round</h1>
-        <table style="border:1px solid black"><tr>
-        <td style="border:1px solid black"><center><p><span id = "instructions">Press the <b>'SPACE'</b> key (or the MARK button) when you see a <b>repeated image</b>. Ready?</span></p></center></td></tr>
-        <tr><td height=450 width=450 style="vertical-align:middle"><center>
-        <span id = "performancerecord">Press <b>SPACE</b> or click <b>MARK</b> to begin practice</span>
-        <div id = "imagesequence"><img id = "stimulus" src = "${fixation_address}"></div>
-        <style>
-        #stimulus {
-            max-width: 400px;
-            max-height: 400px;
-        }
-        </style>
-        </center></td></tr></table>
-        <br>
-        <h3><button type = "button" id = "markbutton" onclick = "processResponseM()" style="border: 1px solid black; height:50; width:50; border-radius:8px">Mark</button></h3><br>
-        </center>
-        </form>
-    `;
+	var practiceView = `
+		<section class="card">
+			<h1 class="section-title">Practice</h1>
+			<p class="lead-text">
+				During practice, respond only when a visualization repeats. Use the <strong>SPACE BAR</strong> or the on-screen mark control.
+			</p>
+			<div class="stimulus-panel">
+				<div id="performancerecord" class="instruction-callout">
+					Press SPACE or select “Mark Repeat” to begin the practice sequence.
+				</div>
+				<div class="stimulus-frame">
+					<img id="stimulus" src="${fixation_address}" alt="Practice stimulus">
+				</div>
+			</div>
+			<div class="controls">
+				<button type="button" class="mark-button" onclick="markButtonPress()">Mark Repeat</button>
+				<span class="muted-text">Keyboard shortcut: Space bar</span>
+			</div>
+		</section>
+	`;
+	document.body.innerHTML = renderShell(practiceView);
 }
 
 // Animate pretrain sequence
@@ -387,19 +648,25 @@ function animatePretrainSequence() {
 
 // Show feedback for pretrain
 function showPretrainFeedback(type) {
-    var feedback = document.createElement('div');
-    feedback.className = 'feedback-overlay feedback-' + type;
-    
-    if (type === 'correct') {
-        feedback.innerHTML = '✅ Correct! You spotted the repeat!';
-    } else if (type === 'miss') {
-        feedback.innerHTML = '❌ Missed! This image was shown before.';
-    } else if (type === 'false-alarm') {
-        feedback.innerHTML = '⚠️ False Alarm! This is a new image.';
-    }
-    
-    document.body.appendChild(feedback);
-    
+	var feedback = document.createElement('div');
+	feedback.className = 'feedback-overlay feedback-' + type;
+	
+	var icon = '';
+	var message = '';
+	if (type === 'correct') {
+		icon = '✓';
+		message = 'Repeat detected';
+	} else if (type === 'miss') {
+		icon = '✗';
+		message = 'Repeat missed';
+	} else if (type === 'false-alarm') {
+		icon = '⚠';
+		message = 'False alarm on novel image';
+	}
+	feedback.innerHTML = `<span class="feedback-icon">${icon}</span><span>${message}</span>`;
+	
+	document.body.appendChild(feedback);
+	
     setTimeout(function() {
         document.body.removeChild(feedback);
     }, 1000);
@@ -451,8 +718,8 @@ function processPretrainResponse() {
 
 // Show pretrain results
 function showPretrainResults() {
-    // Count misses and correct rejections
-    for (var i = 0; i < pretrainPerfSequence.length; i++) {
+	// Count misses and correct rejections
+	for (var i = 0; i < pretrainPerfSequence.length; i++) {
         if (pretrainPerfSequence[i] === MISS) {
             pretrainMisses++;
         } else if (pretrainPerfSequence[i] === CORRECTREJECTION) {
@@ -463,39 +730,37 @@ function showPretrainResults() {
     var totalRepeats = 3;
     var accuracy = Math.round((pretrainHits / totalRepeats) * 100);
     
-    document.body.innerHTML = `
-        <div class="pretrain-result">
-            <h2>🎉 Practice Complete!</h2>
-            
-            <div class="stats-box">
-                <p><strong>Your Performance:</strong></p>
-                <p>Repeats detected: <strong>${pretrainHits} / ${totalRepeats}</strong></p>
-                <p>Accuracy: <strong>${accuracy}%</strong></p>
-                <p>False alarms: <strong>${pretrainFalseAlarms}</strong></p>
-            </div>
-            
-            <div class="tips-box">
-                <h3>💡 Tips for the Real Test:</h3>
-                <ul>
-                    <li><strong>Stay focused</strong> - the real test will be longer</li>
-                    <li><strong>React quickly</strong> when you see a repeat</li>
-                    <li><strong>Don't worry</strong> if you make mistakes - just do your best!</li>
-                    <li>Remember: Press only when you see a <strong>repeated image</strong></li>
-                </ul>
-            </div>
-            
-            <p style="margin-top: 30px; color: #666;">The real experiment will now begin. Good luck!</p>
-            
-            <center>
-                <button class="btn-large" onclick="startRealExperiment()">Start Real Experiment</button>
-            </center>
-        </div>
-    `;
+	var summaryView = `
+		<section class="card">
+			<h1 class="section-title">Practice Summary</h1>
+			<p class="lead-text">
+				The pretrain is complete. Review your performance below before advancing to the primary session.
+			</p>
+			<div class="stats-grid">
+				<div class="stat-item">
+					<div class="stat-label">Repeats Detected</div>
+					<div class="stat-value">${pretrainHits} / ${totalRepeats}</div>
+				</div>
+				<div class="stat-item">
+					<div class="stat-label">Accuracy</div>
+					<div class="stat-value">${accuracy}%</div>
+				</div>
+				<div class="stat-item">
+					<div class="stat-label">False Alarms</div>
+					<div class="stat-value">${pretrainFalseAlarms}</div>
+				</div>
+			</div>
+			<div class="action-row">
+				<button class="primary-button" onclick="startRealExperiment()">Continue to Experiment</button>
+			</div>
+		</section>
+	`;
+	document.body.innerHTML = renderShell(summaryView);
 }
 
 // Start real experiment
 function startRealExperiment() {
-    inPretrainMode = false;
+	inPretrainMode = false;
     
     // Remove pretrain images from the main image array
     var newImages = [];
@@ -508,52 +773,61 @@ function startRealExperiment() {
     
     console.log("Starting real experiment with", images.length, "images");
     
-    // Show the main interface
-    document.body.innerHTML = `
-        <form id="form" autocomplete="off">
-        <input type = "hidden" name = "imseq" id = "imseqout" value = "">
-        <input type = "hidden" name = "imtypeseq" id = "imtypeseqout" value = "">
-        <input type = "hidden" name = "perfseq" id = "perfseqout" value = "">
-        <input type = "hidden" name = "ending" id = "endingout" value = "">
+	var interfaceView = `
+		<form id="form" class="card" autocomplete="off">
+			<input type="hidden" name="imseq" id="imseqout" value="">
+			<input type="hidden" name="imtypeseq" id="imtypeseqout" value="">
+			<input type="hidden" name="perfseq" id="perfseqout" value="">
+			<input type="hidden" name="ending" id="endingout" value="">
 
-        <center>
-        <h1>Memory Test</h1>
-        <table style="border:1px solid black"><tr>
-        <td style="border:1px solid black"><center><p><span id = "instructions">Press the <b>'r'</b> key (or the mark button if you're a mobile user) when you see a <b>repeated image</b>.</span></p></center></td></tr>
-        <tr><td height=450 width=450 style="vertical-align:middle"><center>
-        <span id = "performancerecord">Press the <b>R key</b> (or the mark button) to start. Click in this window first if needed.</span>
-        <div id = "imagesequence"><img id = "stimulus" src = "${fixation_address}"></div>
-        <style>
-        #stimulus {
-            max-width: 400px;
-            max-height: 400px;
-        }
-        </style>
-        </center></td></tr></table>
-        <br>
-        <h3><button type = "button" id = "markbutton" onclick = "processResponseM()" style="border: 1px solid black; height:50; width:50; border-radius:8px">Mark</button></h3><br>
-        <p><span id = "consentinfo">By making judgements about these images, you are participating in a study being performed by students at Ohio State University. Your participation in this research is voluntary.</span></p>
-        <b>Click here to submit your HIT.</b> Only submit when completed!<br><br>
-        <input type = "submit" id="submitbutton" name="Submit HIT" value="Submit HIT">
-        </center>
-        </form>
-    `;
-    
-    // Setup form submission
-    document.getElementById("form").onsubmit = function(e){
-        e.preventDefault();
-        saveProgress();
-        sendToSheets();
-        document.getElementById('form').style.display = 'none';
-        let thankYouDiv = document.createElement('div');
-        thankYouDiv.id = 'thankyou';
-        thankYouDiv.style.textAlign = 'center';
-        thankYouDiv.innerHTML = `<h2>Thank you for participating!</h2><p>Your responses have been recorded. You may now close this window.</p>`;
-        document.body.appendChild(thankYouDiv);
-    };
-    
-    // Now preload and start the real experiment
-    preloadEverything();
+			<h1 class="section-title">Visual Memorability Assessment</h1>
+			<p class="lead-text">
+				Press the <strong>R key</strong> whenever you detect an exact repeat of a visualization. Avoid responses during fixation intervals.
+			</p>
+			<div class="progress-track" aria-hidden="false">
+				<div class="progress-bar" id="experiment-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+			</div>
+			<div id="progress-label" class="progress-label">Progress 0%</div>
+			<div class="stimulus-panel">
+				<div id="performancerecord" class="instruction-callout">
+					Press R or use “Mark Repeat” to initiate the sequence. Ensure this window has keyboard focus.
+				</div>
+				<div class="stimulus-frame">
+					<img id="stimulus" src="${fixation_address}" alt="Stimulus image">
+				</div>
+			</div>
+			<div class="controls">
+				<button type="button" class="mark-button" onclick="markButtonPress()">Mark Repeat</button>
+				<span class="muted-text">Keyboard shortcut: R</span>
+			</div>
+			<p class="irb-note">
+				By continuing you confirm your voluntary participation in an OSU-approved research protocol. Please complete the entire block before submitting.
+			</p>
+			<div class="action-row">
+				<button type="submit" id="submitbutton" class="primary-button">Submit Session</button>
+			</div>
+		</form>
+	`;
+	document.body.innerHTML = renderShell(interfaceView);
+	
+	// Setup form submission
+	document.getElementById("form").onsubmit = function(e){
+		e.preventDefault();
+		saveProgress();
+		sendToSheets();
+		var thanks = `
+			<section class="card text-center">
+				<h1 class="section-title">Submission Received</h1>
+				<p class="lead-text">Thank you for supporting the Computer Vision Lab. Your responses have been securely recorded.</p>
+				<p class="irb-note">You may now close this window.</p>
+			</section>
+		`;
+		document.body.innerHTML = renderShell(thanks);
+	};
+	
+	// Now preload and start the real experiment
+	preloadEverything();
+	updateExperimentProgress();
 }
 
 // key press listener
@@ -600,6 +874,7 @@ function animateSequence(){
 	breakCounter++;
 	
 	imCount++;
+	updateExperimentProgress();
 	if (imCount == fullsequence.length){
 		showEnding();
 		return;
@@ -653,6 +928,26 @@ function buildFullSequence(){
 	console.log("Done building the full sequence.");
 }
 
+function updateExperimentProgress(){
+	var bar = document.getElementById("experiment-progress");
+	var label = document.getElementById("progress-label");
+	if (!bar || fullsequence.length === 0){
+		return;
+	}
+	var completed = 0;
+	if (imCount >= fullsequence.length){
+		completed = fullsequence.length;
+	} else if (imCount >= 0){
+		completed = imCount + 1;
+	}
+	var percent = Math.min(100, (completed / fullsequence.length) * 100);
+	bar.style.width = percent + "%";
+	bar.setAttribute("aria-valuenow", percent.toFixed(1));
+	if (label){
+		label.textContent = "Progress " + Math.round(percent) + "%";
+	}
+}
+
 // get the key and respond
 function processResponse(key){
 	if(String.fromCharCode(key.keyCode).toLowerCase() == keytoWatch.toLowerCase()){
@@ -671,6 +966,14 @@ function processResponse(key){
 			perfsequence[imCount] = FALSEALARM;
 			console.log("False alarm!");
 		}
+	}
+}
+
+function markButtonPress(){
+	if (inPretrainMode){
+		processPretrainResponse();
+	} else {
+		processResponseM();
 	}
 }
 
@@ -953,15 +1256,30 @@ function sendToSheets() {
 var pid = '';
 </script>
 
-<body>
-<div id="splash" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;">
-  	<form id="prolific-form" style="text-align:center;">
-    	<h2>Welcome!</h2>
-    	<p>Please enter your Prolific ID to begin:</p>
-    	<input type="text" id="prolific-id-input" name="prolific_id" required placeholder="Prolific ID" style="font-size:1.2em;padding:8px;">
-    	<br><br>
-    	<button type="submit" style="font-size:1.1em;padding:8px 24px;">Start</button>
-  	</form>
+<div id="splash">
+	<div class="osu-banner">
+		<div class="osu-lockup">
+			<div>
+				<div class="osu-title">The Ohio State University</div>
+				<div class="osu-subtitle">Computer Vision & Visualization Laboratory</div>
+			</div>
+		</div>
+	</div>
+	<div class="splash-wrapper">
+		<div class="splash-card card">
+			<form id="prolific-form">
+				<h1 class="section-title">Scientific Visualization Study</h1>
+				<p class="lead-text">
+					Please enter your Prolific ID (or OSU participant ID) to begin. We will walk you through the pretrain progress first before you take the task. The study lasts approximately five minutes.
+				</p>
+				<label for="prolific-id-input" class="muted-text">Participant ID</label>
+				<input type="text" id="prolific-id-input" name="prolific_id" class="input-field" required placeholder="Enter ID">
+				<div class="action-row">
+					<button type="submit" class="primary-button">Begin</button>
+				</div>
+			</form>
+		</div>
+	</div>
 </div>
 
 <script>
