@@ -1,66 +1,139 @@
+<!DOCTYPE html>
 <html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Test - Scientific Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .feedback-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px 50px;
+            border-radius: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            z-index: 10000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            animation: fadeInOut 1s ease-in-out;
+        }
+        .feedback-correct {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .feedback-miss {
+            background-color: #f44336;
+            color: white;
+        }
+        .feedback-false-alarm {
+            background-color: #ff9800;
+            color: white;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+        .instruction-page {
+            max-width: 800px;
+            margin: 50px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .instruction-page h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .instruction-page p {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #555;
+            margin-bottom: 15px;
+        }
+        .instruction-page ul {
+            font-size: 18px;
+            line-height: 2;
+            color: #555;
+            margin-left: 20px;
+        }
+        .instruction-page strong {
+            color: #2196F3;
+        }
+        .btn-large {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .btn-large:hover {
+            background-color: #1976D2;
+        }
+        .pretrain-result {
+            max-width: 700px;
+            margin: 50px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .pretrain-result h2 {
+            color: #4CAF50;
+            margin-bottom: 30px;
+        }
+        .stats-box {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .stats-box p {
+            font-size: 20px;
+            margin: 10px 0;
+            color: #333;
+        }
+        .tips-box {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .tips-box h3 {
+            color: #1976D2;
+            margin-top: 0;
+        }
+        .tips-box ul {
+            color: #555;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
 
 <!--- Start the Javascript that does all the hard work! --->
 <script type="text/javascript" charset="UTF-8">
 
-/* prolific edition
-- changed the image set from default to mixed visimages
-- modified some variables to suit this experiment better
-- added code to feed data into a google sheet via apps script
-- added a new mark button to support mobile use
-- fixed not allowing continuation upon pressing C while on break
-- added splash screens for starting and ending the experiment
-- multiple bug fixes
-
-*************** Script by Wilma A. Bainbridge, 2016 ***********************
-
-Updated August 26, 2020: Minor updates:
-- Now records responses during fixation
-- Fixed bug not showing "goodbye" message
-- Uses different (more stable) variable to determine experiment trial length
-- Participants now have to press "R" to begin, to ensure correct window focus
-----------------------
-
-This script was generated to help you run your memorability experiment based on the parameters you want. I hope this is useful to you! If you use the memorability scores or this script in any of your work, please cite: 
-
-***
-
-I've streamlined how the experiments are run here in comparison to the original Isola et al., 2011 study. This means there are some differences for the sake of making this easier to handle. Major differences include:
-
-- Participants can no longer pause, exit, and start again later (since you'd need to maintain a database of their information somewhere!)
-- Breaks are fixed time - participants currently can't continue on their own (because of how Javascript's setTimeout works)
-- There is no more practice run. Feel free to make a mini experiment to use as a practice run.
-- There is no feedback for button presses.
-
-The output you will get are four variables:
- 1. imseq: The order of image files shown to participants. Make sure you have no duplicate file names!! (Even if they're in different directories.)
- 2. imtypeseq: The order of trial types.
- 		0 = Fixation trial
- 		1 = First presentation of a target image
- 		2 = Second presentation (target repeat) of a target image
- 		3 = First presentation of a filler image
- 		4 = Second presentation (vigilance repeat) of a filler image
- 3. perfseq: The order of participant behavior for each trial.
- 		11 = hit
- 		12 = miss
- 		13 = false alarm
- 		14 = correct rejection
- 4. ending: Where the participant ended the study. If they finished, it will be set to "completed". If they failed, it will be set to "failed@" and the percentage of trials completed. If they stopped in the middle, it will be blank (but you will know the number of trials completed by the other variables).
- 
-One thing to keep in mind is that the most complex part of this script is optimizing the number of targets, fillers, timing, etc to maximize number of memorability scores and minimize the cost of the experiment. I have a beginning formula here that will give a good estimate but there may be more complicated designs you could imagine implementing (for example, adding more vigilance repeats or more target repeats dynamically and intelligently if there are not enough fillers). Feel free to try your hand at this -- you could even hard-code the image sequence yourself here instead of having it automatically calculated if you want complete control over everything!
-
-Also keep in mind that these scripts don't necessarily account for human error. You may need to get more hits than the # calculated because people will often fail / quit in the middle.
-
-Lastly, this script can be used as-is with Amazon Mechanical Turk, but you will have to implement your own server-side saving mechanism if you want to host it on your own website. The main values to save in the database can be find in the hidden input tags near the end of this script. If you'd like a tutorial on this, contact me and I'll write one up for people to use.
-
-Let me know if you'd like anything added / changed: brainbridgelab@gmail.com. I will not be very actively updating these scripts, but if I get enough requests for a feature or change, I will likely implement it!
-
-*/
-
+/* Modified to include pretrain functionality */
 
 // parameters set by the experimenter
 var fixation_address = "http://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
 var images = new Array("https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111290/text10_znc0jk.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111289/text8_y2toyy.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111289/text6_vpawfh.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111289/text7_zvkpuc.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111289/text9_tzi3hz.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111288/text3_afetxx.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111288/text4_vylzcd.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111287/text2_cqkf6r.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111287/text1_avjjsj.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111287/surface9_izqjqz.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111288/text5_aqxpnr.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111287/surface10_b02unk.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111286/surface8_szl2lb.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111284/surface7_nwdz2e.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111283/surface4_yi2ngr.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111283/surface6_relhbw.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111283/surface5_matvpr.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111282/surface3_jxvtjf.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111282/surface2_uwmqh1.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111282/surface1_e1c1zi.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111281/point10_hj2b5x.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111280/point8_ypfykh.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111280/point9_j5yiic.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111280/point7_ka9dgx.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111280/point6_gu6vyw.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111280/point5_ednd55.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111278/point4_xetcvh.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111278/point3_d9rozu.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111277/nodelink10_asekig.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111277/point2_oiayvd.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111277/point1_d98lcb.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111277/nodelink9_uzdh5b.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111276/nodelink8_a6dbvd.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111275/nodelink7_qkqbpi.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111275/nodelink6_opfusg.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111275/nodelink5_s31tla.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111274/nodelink4_m3oky1.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111274/nodelink3_exlfzl.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111273/nodelink2_vb0vff.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111272/line10_utszkf.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111273/nodelink1_ycuc0d.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111272/line9_sijrvb.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111272/line8_t93zzj.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111272/line7_lxmnz9.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111270/line6_tq0ief.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111270/line5_sb163r.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111270/line4_iqhekn.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111270/line3_sqis4w.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111269/line2_bpagix.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111268/grid10_napfww.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111268/grid8_keyxfp.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111268/line1_day5yn.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111268/grid9_od8uj9.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111266/grid7_ormde1.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111266/grid6_j1e9sp.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111266/grid3_wf3wn2.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111266/grid5_ti7ut6.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111265/glyph10_fcmvcr.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111265/grid4_if2k6n.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111265/glyph8_fxsral.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111265/grid2_v55hqx.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111265/grid1_efaryh.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111263/glyph9_hkhcim.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111263/glyph7_h7f8tj.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111262/glyph6_w6vxxh.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111262/glyph5_kgt1vt.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111261/glyph3_pghnuh.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111262/glyph4_wskbsu.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111261/glyph2_tqtbwl.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111261/glyph1_dfxi4p.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111260/color10_yiq9ov.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111259/color8_wtraks.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111259/color9_lfg9xx.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111259/color7_clqmwn.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111258/color5_kyavlx.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111258/color6_e4e6i2.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111257/color1_f2iead.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111256/bar10_wsbahb.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111256/bar5_fhwday.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111257/color3_pjmg6s.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111257/color4_znonfg.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111256/bar9_u2ba82.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111256/color2_qm9eyc.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111255/bar8_jnzovj.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111255/bar7_tzacsu.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111255/bar4_nsb0pt.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111254/area6_r5fivi.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111255/bar6_nksyxa.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111254/bar2_hggvkn.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111254/area10_rnnsx2.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111254/bar3_qfh4yl.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111254/bar1_vhudoq.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111253/area7_rjswg9.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111253/area9_rqbel4.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111252/area8_ggkuss.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111252/area4_o4rtbi.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111251/area3_w9nmgq.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111251/area5_smohfc.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111251/area2_ge4gp6.png", "https://res.cloudinary.com/dtthoqqbw/image/upload/v1760111251/area1_fvkfyw.png");
+
 var stimtime = 2000; // in milliseconds
 var isi = 1200; // in milliseconds
 var delayBetTargets = 120; // in seconds
@@ -76,6 +149,18 @@ var maxBreakTime = 15; // in seconds
 // text set by the experimenter
 var failuretext = "<h2>Finished!</h2>Unfortunately you made too many errors and the game has ended. Press the <b>SUBMIT HIT</b> button to get credit for the hit.<br>";
 var donetext = "<h2>Finished!</h2>You have finished the task - great job! Press the <b>SUBMIT HIT</b> button to get credit for the hit.<br>";
+
+// Pretrain variables
+var pretrainImages = []; // Will store indices of images used for pretrain
+var pretrainSequence = []; // Full pretrain sequence with repeats
+var pretrainTypeSequence = []; // Type of each pretrain trial
+var pretrainPerfSequence = []; // Performance for pretrain
+var inPretrainMode = false;
+var pretrainImCount = -1;
+var pretrainHits = 0;
+var pretrainMisses = 0;
+var pretrainFalseAlarms = 0;
+var pretrainCorrectRejections = 0;
 
 // global variables that are calculated later based on parameters
 var trialsBetTargets = 30; // in num trials
@@ -105,8 +190,6 @@ var performanceseq = []; // the sequence of performance
 var imCount = -1; // trial number that is being shown. Starts from -1 because of setTimeOut quirks
 
 // tracking performance (to determine if they can continue)
-/* NOTE: This could be implemented in several different ways. For now I will do it as kicking someone out if they reach a certain number of failures, though you could imagine many other ways: 1) do it based on proportion of failures, 2) resetting if they get something right, 3) kicking out based on back-to-back failures, etc. You can try fiddling with determineFailure() to implement your own method!
-*/
 var vigilancefails = 0;
 var falsealarmcounts = 0;
 var kickedOut = 0;
@@ -131,8 +214,359 @@ const CORRECTREJECTION = 14;
 
 /****************************************Functions*****************************************/
 
+// Select pretrain images - 15 images, sampling from each category
+function selectPretrainImages() {
+    // Image categories (10 of each type)
+    var categories = [
+        {name: 'text', start: 0, end: 10},
+        {name: 'surface', start: 10, end: 20},
+        {name: 'point', start: 20, end: 30},
+        {name: 'nodelink', start: 30, end: 40},
+        {name: 'line', start: 40, end: 50},
+        {name: 'grid', start: 50, end: 60},
+        {name: 'glyph', start: 60, end: 70},
+        {name: 'color', start: 70, end: 80},
+        {name: 'bar', start: 80, end: 90},
+        {name: 'area', start: 90, end: 100}
+    ];
+    
+    var selected = [];
+    
+    // Sample 1-2 images from each category to get 15 total
+    // First pass: take 1 from each (10 images)
+    for (var i = 0; i < categories.length; i++) {
+        var cat = categories[i];
+        var randomIndex = cat.start + Math.floor(Math.random() * (cat.end - cat.start));
+        selected.push(randomIndex);
+    }
+    
+    // Second pass: randomly take 5 more from random categories
+    for (var i = 0; i < 5; i++) {
+        var randomCat = categories[Math.floor(Math.random() * categories.length)];
+        var randomIndex = randomCat.start + Math.floor(Math.random() * (randomCat.end - randomCat.start));
+        // Make sure we don't duplicate
+        if (selected.indexOf(randomIndex) === -1) {
+            selected.push(randomIndex);
+        } else {
+            i--; // Try again
+        }
+    }
+    
+    return selected;
+}
+
+// Build pretrain sequence with repeats
+function buildPretrainSequence() {
+    pretrainImages = selectPretrainImages();
+    
+    // Shuffle the pretrain images
+    pretrainImages = shuffleArray(pretrainImages);
+    
+    // Build sequence with 3 repeats at intervals of 5-10 images
+    var sequence = [];
+    var types = [];
+    var perf = [];
+    
+    var repeatIndices = [1, 5, 9]; // Which images to repeat
+    var repeatPositions = [6, 14, 19]; // Where to place repeats (after 5, 8, 10 images)
+    
+    var imgCounter = 0;
+    var seqPos = 0;
+    
+    for (var i = 0; i < 21; i++) { // 15 unique + 3 repeats + some extras = 21 total
+        if (repeatPositions.indexOf(i) !== -1) {
+            // This is a repeat position
+            var whichRepeat = repeatPositions.indexOf(i);
+            var imgToRepeat = pretrainImages[repeatIndices[whichRepeat]];
+            sequence.push(imgToRepeat);
+            types.push(REPEAT);
+            perf.push(MISS); // Default: they'll miss it
+        } else if (imgCounter < pretrainImages.length) {
+            // Regular image
+            sequence.push(pretrainImages[imgCounter]);
+            types.push(TARGET);
+            perf.push(CORRECTREJECTION); // Default: correct rejection
+            imgCounter++;
+        }
+    }
+    
+    pretrainSequence = sequence;
+    pretrainTypeSequence = types;
+    pretrainPerfSequence = perf;
+    
+    console.log("Pretrain sequence built:", pretrainSequence.length, "images");
+}
+
+// Show instruction page
+function showInstructions() {
+    document.body.innerHTML = `
+        <div class="instruction-page">
+            <h2>Welcome to the Visual Memory Test!</h2>
+            <p>In this experiment, you will see a stream of scientific visualization images. Your task is simple:</p>
+            <ul>
+                <li><strong>Watch each image carefully</strong> as it appears for 1 second</li>
+                <li><strong>Press the SPACE key</strong> (or click the MARK button) immediately when you see an image that you have seen before</li>
+                <li>Between images, you will see a <strong>+ symbol</strong> - do not press anything during this time</li>
+            </ul>
+            <p><strong>Important:</strong></p>
+            <ul>
+                <li>Some images will repeat after a while - that's when you should press!</li>
+                <li>Pay close attention - repeated images may look very similar to others</li>
+                <li>It's okay to make mistakes during practice</li>
+            </ul>
+            <p>Let's start with a short <strong>practice round</strong> to help you get familiar with the task.</p>
+            <center>
+                <button class="btn-large" onclick="startPretrain()">Start Practice</button>
+            </center>
+        </div>
+    `;
+}
+
+// Start pretrain
+function startPretrain() {
+    inPretrainMode = true;
+    pretrainImCount = -1;
+    
+    // Reset counters
+    pretrainHits = 0;
+    pretrainMisses = 0;
+    pretrainFalseAlarms = 0;
+    pretrainCorrectRejections = 0;
+    
+    // Show the main interface
+    document.body.innerHTML = `
+        <form id="form" autocomplete="off">
+        <input type = "hidden" name = "imseq" id = "imseqout" value = "">
+        <input type = "hidden" name = "imtypeseq" id = "imtypeseqout" value = "">
+        <input type = "hidden" name = "perfseq" id = "perfseqout" value = "">
+        <input type = "hidden" name = "ending" id = "endingout" value = "">
+
+        <center>
+        <h1>Practice Round</h1>
+        <table style="border:1px solid black"><tr>
+        <td style="border:1px solid black"><center><p><span id = "instructions">Press the <b>'SPACE'</b> key (or the MARK button) when you see a <b>repeated image</b>. Ready?</span></p></center></td></tr>
+        <tr><td height=450 width=450 style="vertical-align:middle"><center>
+        <span id = "performancerecord">Press <b>SPACE</b> or click <b>MARK</b> to begin practice</span>
+        <div id = "imagesequence"><img id = "stimulus" src = "${fixation_address}"></div>
+        <style>
+        #stimulus {
+            max-width: 400px;
+            max-height: 400px;
+        }
+        </style>
+        </center></td></tr></table>
+        <br>
+        <h3><button type = "button" id = "markbutton" onclick = "processResponseM()" style="border: 1px solid black; height:50; width:50; border-radius:8px">Mark</button></h3><br>
+        </center>
+        </form>
+    `;
+}
+
+// Animate pretrain sequence
+function animatePretrainSequence() {
+    pretrainImCount++;
+    
+    if (pretrainImCount >= pretrainSequence.length * 2) { // *2 because we have fixations
+        // Pretrain finished
+        showPretrainResults();
+        return;
+    }
+    
+    // Determine if it's an image or fixation
+    var isImage = (pretrainImCount % 2 === 0);
+    
+    if (isImage) {
+        var imgIndex = Math.floor(pretrainImCount / 2);
+        document.getElementById("stimulus").src = images[pretrainSequence[imgIndex]];
+        setTimeout("animatePretrainSequence()", stimtime);
+    } else {
+        document.getElementById("stimulus").src = fixation_address;
+        setTimeout("animatePretrainSequence()", isi);
+    }
+}
+
+// Show feedback for pretrain
+function showPretrainFeedback(type) {
+    var feedback = document.createElement('div');
+    feedback.className = 'feedback-overlay feedback-' + type;
+    
+    if (type === 'correct') {
+        feedback.innerHTML = '✅ Correct! You spotted the repeat!';
+    } else if (type === 'miss') {
+        feedback.innerHTML = '❌ Missed! This image was shown before.';
+    } else if (type === 'false-alarm') {
+        feedback.innerHTML = '⚠️ False Alarm! This is a new image.';
+    }
+    
+    document.body.appendChild(feedback);
+    
+    setTimeout(function() {
+        document.body.removeChild(feedback);
+    }, 1000);
+}
+
+// Process pretrain response
+function processPretrainResponse() {
+    if (pretrainImCount < 0) {
+        // Start the pretrain
+        document.getElementById("performancerecord").innerHTML = "";
+        animatePretrainSequence();
+        return;
+    }
+    
+    var isImage = (pretrainImCount % 2 === 0);
+    if (!isImage && pretrainImCount > 0) {
+        // They pressed during fixation, check previous image
+        var imgIndex = Math.floor((pretrainImCount - 1) / 2);
+        var trialType = pretrainTypeSequence[imgIndex];
+        
+        if (trialType === REPEAT) {
+            // Hit!
+            pretrainPerfSequence[imgIndex] = HIT;
+            pretrainHits++;
+            showPretrainFeedback('correct');
+        } else {
+            // False alarm
+            pretrainPerfSequence[imgIndex] = FALSEALARM;
+            pretrainFalseAlarms++;
+            showPretrainFeedback('false-alarm');
+        }
+    } else if (isImage) {
+        var imgIndex = Math.floor(pretrainImCount / 2);
+        var trialType = pretrainTypeSequence[imgIndex];
+        
+        if (trialType === REPEAT) {
+            // Hit!
+            pretrainPerfSequence[imgIndex] = HIT;
+            pretrainHits++;
+            showPretrainFeedback('correct');
+        } else {
+            // False alarm
+            pretrainPerfSequence[imgIndex] = FALSEALARM;
+            pretrainFalseAlarms++;
+            showPretrainFeedback('false-alarm');
+        }
+    }
+}
+
+// Show pretrain results
+function showPretrainResults() {
+    // Count misses and correct rejections
+    for (var i = 0; i < pretrainPerfSequence.length; i++) {
+        if (pretrainPerfSequence[i] === MISS) {
+            pretrainMisses++;
+        } else if (pretrainPerfSequence[i] === CORRECTREJECTION) {
+            pretrainCorrectRejections++;
+        }
+    }
+    
+    var totalRepeats = 3;
+    var accuracy = Math.round((pretrainHits / totalRepeats) * 100);
+    
+    document.body.innerHTML = `
+        <div class="pretrain-result">
+            <h2>🎉 Practice Complete!</h2>
+            
+            <div class="stats-box">
+                <p><strong>Your Performance:</strong></p>
+                <p>Repeats detected: <strong>${pretrainHits} / ${totalRepeats}</strong></p>
+                <p>Accuracy: <strong>${accuracy}%</strong></p>
+                <p>False alarms: <strong>${pretrainFalseAlarms}</strong></p>
+            </div>
+            
+            <div class="tips-box">
+                <h3>💡 Tips for the Real Test:</h3>
+                <ul>
+                    <li><strong>Stay focused</strong> - the real test will be longer</li>
+                    <li><strong>React quickly</strong> when you see a repeat</li>
+                    <li><strong>Don't worry</strong> if you make mistakes - just do your best!</li>
+                    <li>Remember: Press only when you see a <strong>repeated image</strong></li>
+                </ul>
+            </div>
+            
+            <p style="margin-top: 30px; color: #666;">The real experiment will now begin. Good luck!</p>
+            
+            <center>
+                <button class="btn-large" onclick="startRealExperiment()">Start Real Experiment</button>
+            </center>
+        </div>
+    `;
+}
+
+// Start real experiment
+function startRealExperiment() {
+    inPretrainMode = false;
+    
+    // Remove pretrain images from the main image array
+    var newImages = [];
+    for (var i = 0; i < images.length; i++) {
+        if (pretrainImages.indexOf(i) === -1) {
+            newImages.push(images[i]);
+        }
+    }
+    images = newImages;
+    
+    console.log("Starting real experiment with", images.length, "images");
+    
+    // Show the main interface
+    document.body.innerHTML = `
+        <form id="form" autocomplete="off">
+        <input type = "hidden" name = "imseq" id = "imseqout" value = "">
+        <input type = "hidden" name = "imtypeseq" id = "imtypeseqout" value = "">
+        <input type = "hidden" name = "perfseq" id = "perfseqout" value = "">
+        <input type = "hidden" name = "ending" id = "endingout" value = "">
+
+        <center>
+        <h1>Memory Test</h1>
+        <table style="border:1px solid black"><tr>
+        <td style="border:1px solid black"><center><p><span id = "instructions">Press the <b>'r'</b> key (or the mark button if you're a mobile user) when you see a <b>repeated image</b>.</span></p></center></td></tr>
+        <tr><td height=450 width=450 style="vertical-align:middle"><center>
+        <span id = "performancerecord">Press the <b>R key</b> (or the mark button) to start. Click in this window first if needed.</span>
+        <div id = "imagesequence"><img id = "stimulus" src = "${fixation_address}"></div>
+        <style>
+        #stimulus {
+            max-width: 400px;
+            max-height: 400px;
+        }
+        </style>
+        </center></td></tr></table>
+        <br>
+        <h3><button type = "button" id = "markbutton" onclick = "processResponseM()" style="border: 1px solid black; height:50; width:50; border-radius:8px">Mark</button></h3><br>
+        <p><span id = "consentinfo">By making judgements about these images, you are participating in a study being performed by students at Ohio State University. Your participation in this research is voluntary.</span></p>
+        <b>Click here to submit your HIT.</b> Only submit when completed!<br><br>
+        <input type = "submit" id="submitbutton" name="Submit HIT" value="Submit HIT">
+        </center>
+        </form>
+    `;
+    
+    // Setup form submission
+    document.getElementById("form").onsubmit = function(e){
+        e.preventDefault();
+        saveProgress();
+        sendToSheets();
+        document.getElementById('form').style.display = 'none';
+        let thankYouDiv = document.createElement('div');
+        thankYouDiv.id = 'thankyou';
+        thankYouDiv.style.textAlign = 'center';
+        thankYouDiv.innerHTML = `<h2>Thank you for participating!</h2><p>Your responses have been recorded. You may now close this window.</p>`;
+        document.body.appendChild(thankYouDiv);
+    };
+    
+    // Now preload and start the real experiment
+    preloadEverything();
+}
+
 // key press listener
-document.onkeydown = function(key){ processResponse(key);};
+document.onkeydown = function(key){ 
+    if (inPretrainMode) {
+        if (String.fromCharCode(key.keyCode).toLowerCase() === ' ' || 
+            String.fromCharCode(key.keyCode).toLowerCase() === 'space') {
+            processPretrainResponse();
+        }
+    } else {
+        processResponse(key);
+    }
+};
 
 document.addEventListener('keydown', function(event) {
     if (onBreak && event.key.toLowerCase() === 'c') {
@@ -142,28 +576,22 @@ document.addEventListener('keydown', function(event) {
 
 // preload and then start
 function buttonPress(){
-	// disable the Start Button once started
 	document.getElementById("startbutton").innerHTML = "Experiment Running...";
 	document.getElementById("startbutton").disabled = true;
-	// now start the experiment
 	preloadEverything();
 	document.getElementById("performancerecord").innerHTML = "Press the <b>R key</b> (or the mark button for mobile users) to start. If it doesn't work, make sure to click in this browser window first.";
 }
 
 // recursive function that shows the images in a sequence
 function animateSequence(){
-
-	// save the performance of the previous trial
 	saveProgress();
 	
-	// check if they've failed too much
 	determineFailure();
 	if (kickedOut){
 		showFailure();
 		return;
 	}
 	
-	// check if it's time for a break
 	if (breakCounter >= trialsBetweenBreaks) {
 		giveBreak(0);
 		breakCounter = -1;
@@ -171,7 +599,7 @@ function animateSequence(){
 	}
 	breakCounter++;
 	
-	imCount++; // have to increment before the trial because of setTimeOut
+	imCount++;
 	if (imCount == fullsequence.length){
 		showEnding();
 		return;
@@ -183,17 +611,10 @@ function animateSequence(){
 
 // preload and calculate everything
 function preloadEverything() {
-	calculateProps(); // calculate target and filler proportions
-	/* NOTE: If you decide to manually separate the targets and foils, set their amounts here to 
-	override what was calculated in calculateProps(). We still need to run calculateProps() for other values.
-	For example:
-		numtargets = 100;
-		numfoils = 500;
-	*/
-	makeImSequence(); // get the image order
-	calculateTotalPay(); // calculate payment
-	buildFullSequence(); // build the sequence with the images and fixation
-	// document.getElementById("startbutton").disabled = false;
+	calculateProps();
+	makeImSequence();
+	calculateTotalPay();
+	buildFullSequence();
 }
 
 // allows the participant to take a break
@@ -216,15 +637,13 @@ function buildFullSequence(){
 	var i = 0;
 	var imcounter = 0;
 	while (i < imtypeseq.length*2){
-		// add an image
-		fullsequence[i] = images[allimgseq[imcounter]]; // get the image in that order
+		fullsequence[i] = images[allimgseq[imcounter]];
 		typesequence[i] = imtypeseq[imcounter];
 		timesequence[i] = stimtime;
 		perfsequence[i] = performanceseq[imcounter];
 		i++;
 		imcounter++;
 		
-		// add a fixation
 		fullsequence[i] = fixation_address;
 		typesequence[i] = FIXATION;
 		timesequence[i] = isi;
@@ -236,19 +655,19 @@ function buildFullSequence(){
 
 // get the key and respond
 function processResponse(key){
-	if(String.fromCharCode(key.keyCode).toLowerCase() == keytoWatch.toLowerCase()){ // if they pressed the desired key
+	if(String.fromCharCode(key.keyCode).toLowerCase() == keytoWatch.toLowerCase()){
 		var trialtype = typesequence[imCount];
-		if (imCount<0) { // they're pressing to start
+		if (imCount<0) {
 			document.getElementById("performancerecord").innerHTML = "";
 			animateSequence();
 		}
-		if ((trialtype == FIXATION) && imCount > 0) { // if it's fixation, get their response for the prior trial
+		if ((trialtype == FIXATION) && imCount > 0) {
 			trialtype = typesequence[imCount-1];
 		}
-		if (trialtype == REPEAT | trialtype == VIGILANCE) { // they correctly pressed the button!
+		if (trialtype == REPEAT | trialtype == VIGILANCE) {
 			perfsequence[imCount] = HIT;
 			console.log("Hit!");
-		} else if (trialtype == TARGET | trialtype == FILLER) { // they shouldn't have pressed
+		} else if (trialtype == TARGET | trialtype == FILLER) {
 			perfsequence[imCount] = FALSEALARM;
 			console.log("False alarm!");
 		}
@@ -257,18 +676,23 @@ function processResponse(key){
 
 // for mobile
 function processResponseM(){
+    if (inPretrainMode) {
+        processPretrainResponse();
+        return;
+    }
+    
 	var trialtype = typesequence[imCount];
-	if (imCount<0) { // they're pressing to start
+	if (imCount<0) {
 		document.getElementById("performancerecord").innerHTML = "";
 		animateSequence();
 	}
-	if ((trialtype == FIXATION) && imCount > 0) { // if it's fixation, get their response for the prior trial
+	if ((trialtype == FIXATION) && imCount > 0) {
 		trialtype = typesequence[imCount-1];
 	}
-	if (trialtype == REPEAT | trialtype == VIGILANCE) { // they correctly pressed the button!
+	if (trialtype == REPEAT | trialtype == VIGILANCE) {
 		perfsequence[imCount] = HIT;
 		console.log("Hit!");
-	} else if (trialtype == TARGET | trialtype == FILLER) { // they shouldn't have pressed
+	} else if (trialtype == TARGET | trialtype == FILLER) {
 		perfsequence[imCount] = FALSEALARM;
 		console.log("False alarm!");
 	}
@@ -280,7 +704,7 @@ function determineFailure(){
 		falsealarmcounts++;
 		console.log("False alarm count: " + falsealarmcounts);
 	}
-	if (falsealarmcounts >= facutoff){ // they've false alarmed too often!
+	if (falsealarmcounts >= facutoff){
 		kickedOut = 1;
 	}
 	
@@ -297,7 +721,7 @@ function determineFailure(){
 function showFailure(){
 	document.getElementById("performancerecord").innerHTML = failuretext;
 	propcompleted = imCount/fullsequence.length*100;
-	propcompleted = propcompleted.toFixed(2); // round to 2 decimal places
+	propcompleted = propcompleted.toFixed(2);
 	document.getElementById("endingout").value = "failed@" + propcompleted + "%";
 }
 
@@ -309,16 +733,8 @@ function showEnding(){
 
 // create the memorability-based image sequence
 function makeImSequence(){
-
-	/* NOTE: This code assumes you want to get the memorability scores of all of your images. If you instead have images you already know will be sorted as target vs. filler, you can edit that here. To do that:
-		1. Input images as targets followed by fillers (in the textbox list of images in the other frame, or at the top with var images = ...
-		2. Set numtargets to your number of targets
-		3. Remove allImArray = shuffleArray(allImArray).
-	The reason I haven't implemented this is because this depends on you choosing a good number of targets and fillers (rather than me calculating it for you here) and so it takes some thought
-	*/
-
 	var allImArray = populateArray(0, images.length);
-	allImArray = shuffleArray(allImArray); // Comment this if you want to manually determine the targets and fillers
+	allImArray = shuffleArray(allImArray);
 	var targetIms = allImArray.slice(0, numtargets);
 	var fillerIms = allImArray.slice(numtargets, allImArray.length);
 	var imblock = [];
@@ -329,39 +745,38 @@ function makeImSequence(){
 	repeatIms = shuffleArray(targetIms);
 	fillerIms = shuffleArray(fillerIms);
 	
-	tc = 0; // target counter
-	fc = 0; // filler counter
-	ofbc = 0; // old filler block counter
-	rc = 0; // repeat counter
-	allc = 0; // overall sequence counter
+	tc = 0;
+	fc = 0;
+	ofbc = 0;
+	rc = 0;
+	allc = 0;
 	
-	// now make pseudorandomized image blocks of 4 trials each
 	oldfillblock = [];
 	
 	while (rc < repeatIms.length & fc < fillerIms.length){
-		var c = 0; // mini-block counter
+		var c = 0;
 		
-		if (tc < targetIms.length) { // TRIAL 1: a new targets (if there are still new ones to add)
+		if (tc < targetIms.length) {
 			imblock[c] = targetIms[tc]; 
 			typeblock[c] = TARGET;
-			perfblock[c] = CORRECTREJECTION; // default: no response means CR
+			perfblock[c] = CORRECTREJECTION;
 			tc++; c++; allc++;
-		} else { // if we're out of new targets, put in a regular filler
+		} else {
 			imblock[c] = fillerIms[fc];
 			typeblock[c] = FILLER;
-			perfblock[c] = CORRECTREJECTION; // default: no response means CR
+			perfblock[c] = CORRECTREJECTION;
 			oldfillblock[ofbc] = fillerIms[fc];
 			c++; allc++; ofbc++; fc++;
 		}
 	
-		if (oldfillblock.length > 0) { // TRIAL 2: vigilance repeat from the last block
+		if (oldfillblock.length > 0) {
 			oldfillblock = shuffleArray(oldfillblock);
 			imblock[c] = oldfillblock[0];
 			typeblock[c] = VIGILANCE;
-			perfblock[c] = MISS; // default: no response means they missed it
+			perfblock[c] = MISS;
 			c++; allc++;
 			oldfillblock = []; ofbc = 0;
-		} else { // if there was no last block, put in a regular filler
+		} else {
 			imblock[c] = fillerIms[fc];
 			typeblock[c] = FILLER;
 			perfblock[c] = CORRECTREJECTION;
@@ -369,12 +784,12 @@ function makeImSequence(){
 			c++; allc++; ofbc++; fc++;
 		}
 	
-		if (allc > trialsBetTargets) { // TRIAL 3: if enough delay has passed, can do target repeats
+		if (allc > trialsBetTargets) {
 			imblock[c] = repeatIms[rc];
 			typeblock[c] = REPEAT;
 			perfblock[c] = MISS;
 			rc++; c++; allc++;
-		} else{ // if it's not time for the target repeats yet, put in a regular filler
+		} else{
 			imblock[c] = fillerIms[fc];
 			typeblock[c] = FILLER;
 			perfblock[c] = CORRECTREJECTION;
@@ -382,8 +797,8 @@ function makeImSequence(){
 			c++; allc++; ofbc++; fc++;
 		}
 	
-		for (var i = 0; i < delayBetVigilance-3; i++){ // remaining trials: filler
-			if (fc < fillerIms.length) { // only if there are fillers left to fill
+		for (var i = 0; i < delayBetVigilance-3; i++){
+			if (fc < fillerIms.length) {
 				imblock[c] = fillerIms[fc]; 
 				typeblock[c] = FILLER;
 				perfblock[c] = CORRECTREJECTION;
@@ -411,30 +826,12 @@ function calculateProps(){
 	var S = delayBetVigilance;
 	var C = images.length;
 	
-	numfoils = (S-1 + (S-2)*(C+(B/S)-1)-(B/S))/(S-1); // derived formula for how many foils you can have that satisfy your constraints
-	
-	/* Derivation comes from this:
-	variables:
-	C = # images, T = # targets, F = # foils, S = number of trials per block, B = minimum # of trials between targets
-	abbreviations:
-	t = target, f = foil, v = vigilance repeat, r = target repeat
-	
-	F = (first block is 1 t, the rest f) + (blocks before r starts is 1 t, 1 v, the rest f) + (remaining blocks are 1 t, 1 v, 1 r, the rest f) + (except for blocks when you're not showing any new t, put back a f to fill that space)
-	F = (S-1) + (S-2)(B/S - 1) + (S-3)(T) + (T - B/S)		C = T + F
-	F = (S-1) + (S-2)(B/S - 1) + (S-3)(C-F) + (C-F - B/S)
-	...
-	F = (S-1 + (S-2)(C + B/S - 1) - B/S)/(S-1)
-	
-	*/
+	numfoils = (S-1 + (S-2)*(C+(B/S)-1)-(B/S))/(S-1);
 	numtargets = C - numfoils;
 	
 	numfoils = Math.floor(numfoils);
 	numtargets = Math.ceil(numtargets);
 	
-	// calculate how many subjects will be needed total
-	var proptargets = C / numtargets * subsperim;
-	
-	// calculate how many trials before a break
 	trialsBetweenBreaks = Math.ceil(timeBetweenBreaks*1000/trialtime);
 	
 	console.log("Calculated the proportions of images.");
@@ -442,7 +839,6 @@ function calculateProps(){
 
 // calculate the total pay for the whole study
 function calculateTotalPay(){
-	// calculate how many subjects will be needed total
 	var proptargets = images.length / numtargets;
 	numtotalsubs = proptargets * subsperim;
 	
@@ -461,7 +857,6 @@ function reportVariables(){
 
 // save to the output variables the performance and sequence completed so far
 function saveProgress(){
-	// get rid of the base address again just to shrink the length of the value
 	if (imCount >= 0) {
 		var tempimg = fullsequence[imCount];
 		tempimg = tempimg.substring(tempimg.lastIndexOf("/")+1);
@@ -476,12 +871,11 @@ function saveProgress(){
 		document.getElementById("imseqout").value = imgstring;
 		document.getElementById("imtypeseqout").value = imtypestring;
 		document.getElementById("perfseqout").value = perfstring;
-		}
+	}
 }
 
 /*************************************** General useful functions **********************************************/
 
-// populate an array
 function populateArray(start, end){
 	array = [];
 	for (var i = start; i < end; i++){
@@ -490,7 +884,6 @@ function populateArray(start, end){
 	return array;
 }
 
-// shuffle an array
 function shuffleArray(array) {
     for (var i = array.length - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
@@ -501,7 +894,6 @@ function shuffleArray(array) {
     return array;
 }
 
-// shuffle multiple arrays with the same ordering (must all be same length)
 function shuffleArrays(arrays){
 	for (var i = arrays[0].length - 1; i > 0; i--) {
 		var j = Math.floor(Math.random() * (i + 1));
@@ -514,7 +906,6 @@ function shuffleArrays(arrays){
 	return arrays;
 }
 			
-// count the number of occurrences of a value in an array
 function countOccurences(array, value){
 	var counter = 0;
 	for (var i = 0; i < array.length; i++){
@@ -525,27 +916,24 @@ function countOccurences(array, value){
 	return counter;
 }
 
-// send collected data (console information) to a google sheet
 function sendToSheets() {
-	// Collect all form data
-    const form = document.getElementById('form');
+	const form = document.getElementById('form');
     const formData = new FormData(form);
     const data = {
-			prolific_id: pid,
-			imseq: imgstring,
-        	imtypeseq: imtypestring,
-        	perfseq: perfstring,
-        	ending: document.getElementById("endingout").value,
-        	vigilancefails: vigilancefails,
-        	falsealarmcounts: falsealarmcounts
-		};
+		prolific_id: pid,
+		imseq: imgstring,
+        imtypeseq: imtypestring,
+        perfseq: perfstring,
+        ending: document.getElementById("endingout").value,
+        vigilancefails: vigilancefails,
+        falsealarmcounts: falsealarmcounts
+	};
 	const appsURL = "https://script.google.com/macros/s/AKfycbwHrtdpZCQxWMxM4eEygi0ucWYixxAPEKHaYob6n5ArJkQDg1ifrDHb_Hd94ZNxzzz7/exec";
-    // Convert FormData to a plain object
+    
     for (let [key, value] of formData.entries()) {
         data[key] = value;
     }
 
-    // Add any additional data you want to send
     data.vigilancefails = vigilancefails;
     data.falsealarmcounts = falsealarmcounts;
 
@@ -560,9 +948,10 @@ function sendToSheets() {
         console.log("Data sent to Google Sheets!");
     }).catch(err => console.error("Error:", err));
 }
+
+// Initialize - show splash screen first
+var pid = '';
 </script>
-
-
 
 <body>
 <div id="splash" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;">
@@ -575,73 +964,20 @@ function sendToSheets() {
   	</form>
 </div>
 
-<form id="form" autocomplete="off">
-
-<!--- These are the hidden variables that get outputted to AMT --->
-<input type = "hidden" name = "imseq" id = "imseqout" value = "">
-<input type = "hidden" name = "imtypeseq" id = "imtypeseqout" value = "">
-<input type = "hidden" name = "perfseq" id = "perfseqout" value = "">
-<input type = "hidden" name = "ending" id = "endingout" value = "">
-
-<center>
-<h1>Memory Test</h1>
-	<table style="border:1px solid black"><tr>
-	<td style="border:1px solid black"><center><p><span id = "instructions">You will see a stream of images. Press the <b>'r'</b> key (or the mark button if you're a mobile user) any time you see an <b>image</b> you saw before. Press when you see the image and not during the '+'. If you make too many errors, the game will finish. This will take approximately 5 minutes.</span></p></center></td></tr>
-	<tr><td height=450 width=450 style="vertical-align:middle"><center>
-	<span id = "performancerecord">
-	</span>
-	<div id = "imagesequence"><img id = "stimulus" src = "http://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg"></div>
-	<style>
-	#stimulus {
-		max-width: 400px;
-		max-height: 400px;
-	}
-	</style>
-	</center></td></tr></table>
-<br>
-<h3><button type = "button" id = "startbutton" onclick = "buttonPress()" autocomplete="off" style="border: 1px solid black; height:70; width:250; border-radius:12px">Click to Start</button></h3><br>
-<h3><button type = "button" id = "markbutton" onclick = "processResponseM()" style="border: 1px solid black; height:50; width:50; border-radius:8px">Mark</button></h3><br>
-<p><span id = "consentinfo">By making judgements about these images, you are participating in a study being performed by students at Ohio State University. Your participation in this research is voluntary. You may decline further participation, at any time, without adverse consequences. Your anonymity is assured; the researchers who have requested your participation will not receive any personal information about you.</span></p>
-<b>Click here to submit your HIT.</b> Only submit when completed, or you won't get full payment! If you decide to stop halfway, you can click this to end.<br><br>
-<input type = "submit" id="submitbutton" name="Submit HIT" value="Submit HIT">
-</center>
-</form>
 <script>
-  	// Hide the main form initially
-  	document.getElementById('form').style.display = 'none';
-	var pid = '';
-  	// Handle splash screen form submission
   	document.getElementById('prolific-form').onsubmit = function(e) {
    		e.preventDefault();
     	pid = document.getElementById('prolific-id-input').value.trim();
     	if(pid) {
-      		// Store Prolific ID in a hidden field in the main form
-      		let hidden = document.createElement('input');
-      		hidden.type = 'hidden';
-      		hidden.name = 'prolific_id';
-      		hidden.id = 'prolific_id_hidden';
-      		hidden.value = pid;
-      		document.getElementById('form').appendChild(hidden);
-
-      		// Hide splash, show main form
       		document.getElementById('splash').style.display = 'none';
-      		document.getElementById('form').style.display = '';
+      		
+      		// Build pretrain sequence
+      		buildPretrainSequence();
+      		
+      		// Show instructions
+      		showInstructions();
     	}
   	};
-
-  	document.getElementById("form").onsubmit = function(e){
-		e.preventDefault(); // prevent the default form submission
-		saveProgress();
-		sendToSheets(); // send the data to Google Sheets
-		// Hide the form and show a thank you message
-    	document.getElementById('form').style.display = 'none';
-    	// Create and show thank you message
-    	let thankYouDiv = document.createElement('div');
-    	thankYouDiv.id = 'thankyou';
-    	thankYouDiv.style.textAlign = 'center';
-    	thankYouDiv.innerHTML = `<h2>Thank you for participating!</h2><p>Your responses have been recorded. You may now close this window.</p>`;
-    	document.body.appendChild(thankYouDiv);
-	}
 </script>
 </body>
 </html>
