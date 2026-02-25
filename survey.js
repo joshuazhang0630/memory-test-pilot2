@@ -273,7 +273,7 @@ function sendToSheets() {
     };
 
     const payload = {
-        spreadsheet_id: "19__35IVHmBkPm2zFMKrNoIY3QfmN0pSyEIYtCdOph6A",
+        spreadsheet_id: "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY",
         worksheet_name: "工作表1",
         schema_version: "v2",
         rows: trialRows.concat([summaryEvent]),

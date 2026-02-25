@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-REPO="/Users/joshua/.openclaw/workspace/projects/memorability-game/repo"
-SID="19__35IVHmBkPm2zFMKrNoIY3QfmN0pSyEIYtCdOph6A"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+SID="1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY"
 TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 TAG="step3_sheet_smoke_${RANDOM}"
 

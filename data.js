@@ -133,7 +133,7 @@ function initializeParticipantLevels(participantId){
         levelKeys.push(String(i));
     }
 
-    var seedInput = (participantId || "anon") + "|" + (studyVersion || "v1") + "|" + (studySalt || "salt");
+    var seedInput = "pilot2-fixed-level-pools|" + (studyVersion || "pilot2-v1") + "|" + (studySalt || "salt");
     var rng = makeSeededRng(hashString(seedInput));
 
     var shuffledTargets = shuffleWithRng(manifestData.registry.targets, rng);

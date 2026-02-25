@@ -58,11 +58,11 @@ Additional 2024 updates:
 
 
 var fixation_address = "http://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
-var targetManifestUrl = "https://ivcl.jiangsn.com/visFullDataset/target/manifest.json";
-var fillerManifestUrl = "https://ivcl.jiangsn.com/visFullDataset/filler/manifest.json";
-var studyVersion = "vis-mem-v2";
-var studySalt = "solar-is-ship-ai";
-var activeLevelCount = 5;
+var targetManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/target/manifest.json";
+var fillerManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/filler/manifest.json";
+var studyVersion = "pilot2-v1";
+var studySalt = "pilot2-fixed-pools";
+var activeLevelCount = 2;
 var images = [];
 var allImagesCatalog = [];
 var imageLoadPromise = null;

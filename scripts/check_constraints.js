@@ -1,7 +1,8 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const base = '/Users/joshua/.openclaw/workspace/projects/memorability-game/repo';
+const path = require('path');
+const base = path.resolve(__dirname, '..');
 const quietConsole = { log:()=>{}, warn:()=>{}, error:()=>{} };
 const ctx = { console: quietConsole, setTimeout, clearTimeout };
 ctx.document = {
