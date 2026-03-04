@@ -57,7 +57,7 @@ Additional 2024 updates:
 */
 
 
-var fixation_address = "http://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
+var fixation_address = "https://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
 var targetManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/target/manifest.json";
 var fillerManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/filler/manifest.json";
 var studyVersion = "pilot2-v1";
