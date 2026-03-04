@@ -239,7 +239,7 @@ async function postWithRetries(appsURL, payload, attempts){
 async function sendToSheets() {
 	const form = document.getElementById('form');
     const formData = new FormData(form);
-    const appsURL = "https://script.google.com/macros/s/AKfycbwoVnAqV03kDx44YfwHrLuLtKyzOiyi4W51VmL-rfzitaE8nvCxek0D1CGKb96F60iz2g/exec";
+    const appsURL = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec";
 
     const baseMeta = {
         user_id: pid,
@@ -360,7 +360,7 @@ async function sendToSheets() {
         var chunk = allRows.slice(start, start + chunkSize);
         const payload = {
             spreadsheet_id: "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY",
-            worksheet_name: "工作表1",
+            worksheet_name: "sheet1",
             schema_version: "v2",
             rows: chunk,
             chunk_index: Math.floor(start / chunkSize),
