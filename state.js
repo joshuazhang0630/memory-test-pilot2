@@ -176,6 +176,9 @@ var imgstring = "";
 var imtypestring = "";
 var perfstring = "";
 var trialEventRows = [];
+var currentSessionId = "";
+var checkpointEveryTrials = 20;
+var lastCheckpointTrialCount = 0;
 
 // Dev/test helpers (set in console)
 var devFastMode = false;

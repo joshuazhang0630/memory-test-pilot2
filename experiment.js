@@ -369,6 +369,8 @@ function startRealExperiment() {
 	imgstring = "";
 	imtypestring = "";
 	perfstring = "";
+	currentSessionId = (pid || "anon") + "-" + Date.now();
+	lastCheckpointTrialCount = 0;
 	falsealarmcounts = 0;
 	vigilancefails = 0;
 	kickedOut = 0;
@@ -773,7 +775,7 @@ function showPostSurvey(){
 	var postForm = document.getElementById("form");
 	if (postForm){
 		setEnglishValidationMessages(postForm);
-		var handlePostSubmit = function(e){
+		var handlePostSubmit = async function(e){
 			if (e){
 				e.preventDefault();
 			}
@@ -784,7 +786,7 @@ function showPostSurvey(){
 			postSurveyResponses.rememberFeaturesA = (document.getElementById("remember-features-a").value || "").trim();
 			postSurveyResponses.rememberFeaturesB = (document.getElementById("remember-features-b").value || "").trim();
 			postSurveyResponses.studyComments = (document.getElementById("study-comments").value || "").trim();
-			sendToSheets();
+			await sendToSheets();
 			var thanks = `
 				<section class="card text-center">
 					<h1 class="section-title">Submission Received</h1>
@@ -893,6 +895,9 @@ function finishStudyEarly(){
 	experimentCompleted = true;
     stopAfterLevel = currentLevelKey || "";
 	endingStatus = "partial_complete";
+    if (typeof persistTrialCheckpoint === "function"){
+        persistTrialCheckpoint();
+    }
 	var endingInput = document.getElementById("endingout");
 	if (endingInput){
 		endingInput.value = endingStatus;
@@ -913,6 +918,9 @@ function showEnding(){
 	}
 	experimentCompleted = true;
 	endingStatus = "completed";
+    if (typeof persistTrialCheckpoint === "function"){
+        persistTrialCheckpoint();
+    }
 	var endingInput = document.getElementById("endingout");
 	if (endingInput){
 		endingInput.value = endingStatus;
@@ -1175,7 +1183,7 @@ function collectTrialEvent(index){
         timestamp_iso: new Date().toISOString(),
         user_id: pid || "",
         participant_id: pid || "",
-        session_id: (pid || "anon") + "-" + (experimentStartTimestamp || Date.now()),
+        session_id: currentSessionId || ((pid || "anon") + "-" + (experimentStartTimestamp || Date.now())),
         study_version: studyVersion || "vis-mem-v2",
         level_index: Number(currentLevelKey || 0),
         trial_index: index,
@@ -1213,7 +1221,13 @@ function collectTrialEvent(index){
         post_q8: "",
         client_meta_json: ""
     };
+    row.event_id = row.session_id + ":trial:" + row.trial_index;
     trialEventRows.push(row);
+
+    if (typeof persistTrialCheckpoint === "function" && trialEventRows.length - lastCheckpointTrialCount >= checkpointEveryTrials){
+        lastCheckpointTrialCount = trialEventRows.length;
+        persistTrialCheckpoint();
+    }
 }
 
 // save to the output variables the performance and sequence completed so far
