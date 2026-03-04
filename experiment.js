@@ -1030,12 +1030,19 @@ function buildLevelSequence(levelKey){
 		var types = new Array(totalSlots).fill(null);
 		var perf = new Array(totalSlots).fill(null);
 
+		var targetLagMin = targetRepeatDelayMin;
+		var targetLagMax = targetRepeatDelayMax;
+		if (typeof devFastMode !== "undefined" && devFastMode && totalSlots <= 40){
+			targetLagMin = 1;
+			targetLagMax = Math.max(2, Math.min(6, totalSlots - 2));
+		}
+
 		// strict target placement
 		for (var t = 0; t < targets.length; t++){
 			var item = targets[t];
 			var placed = false;
 			for (var attempt = 0; attempt < 400; attempt++){
-				var lag = randomInt(targetRepeatDelayMin, targetRepeatDelayMax);
+				var lag = randomInt(targetLagMin, targetLagMax);
 				var maxFirst = totalSlots - lag - 1;
 				if (maxFirst < 0){
 					break;

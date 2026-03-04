@@ -140,9 +140,16 @@ function initializeParticipantLevels(participantId){
     var shuffledFillers = shuffleWithRng(manifestData.registry.fillers, rng);
 
     // Per-level design budget (must fit levelTrialCount and lag constraints)
-    var targetPairsPerLevel = 16; // => 32 slots (more robust strict lag-fit margin)
-    var vigilancePairsPerLevel = 6; // => 12 slots
-    var fillerSinglesPerLevel = Math.max(0, levelTrialCount - (targetPairsPerLevel * 2) - (vigilancePairsPerLevel * 2)); // default 72
+    var targetPairsPerLevel = 16; // production default
+    var vigilancePairsPerLevel = 6; // production default
+
+    // Dev fast mode guard: shrink pair counts so tiny trial counts can still build sequences
+    if (typeof devFastMode !== "undefined" && devFastMode && levelTrialCount <= 40){
+        targetPairsPerLevel = Math.max(1, Math.floor(levelTrialCount * 0.15));
+        vigilancePairsPerLevel = Math.max(1, Math.floor(levelTrialCount * 0.05));
+    }
+
+    var fillerSinglesPerLevel = Math.max(0, levelTrialCount - (targetPairsPerLevel * 2) - (vigilancePairsPerLevel * 2));
 
     var neededTargets = targetPairsPerLevel * levelCount;
     var neededVigilance = vigilancePairsPerLevel * levelCount;
