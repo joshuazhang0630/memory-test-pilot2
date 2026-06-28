@@ -1,7 +1,7 @@
 function selectPretrainImages() {
     var pool = pretestImages.slice();
     shuffleArray(pool);
-    return pool.slice(0, Math.min(15, pool.length));
+    return pool.slice(0, Math.min(20, pool.length));
 }
 
 // Build pretrain sequence with repeats
@@ -31,7 +31,8 @@ function buildPretrainSequence() {
     var imgCounter = 0;
     var seqPos = 0;
     
-    for (var i = 0; i < 21; i++) { // 15 unique + 3 repeats + some extras = 21 total
+    var targetLength = pretrainImages.length + repeatPositions.length;
+    for (var i = 0; i < targetLength; i++) {
         if (repeatPositions.indexOf(i) !== -1) {
             // This is a repeat position
             var whichRepeat = repeatPositions.indexOf(i);
@@ -1256,4 +1257,3 @@ function saveProgress(){
 		document.getElementById("perfseqout").value = perfstring;
 	}
 }
-

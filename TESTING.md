@@ -48,6 +48,13 @@ Use this to simulate the full flow with very short sequences.
 - `runFastFlow()`  
   Sets fast mode and shows the instruction screen so you can click through practice and the real experiment quickly.
 
+## Backend Sheet Smoke Test
+
+- From a terminal in the repo:
+  - `bash scripts/check_sheet_write.sh`
+
+This posts one smoke row through the same Apps Script backend used by the game, then reads the Google Sheet back with `gog` and prints `backend_sheet_write_ok tag=...` only if the tag is found. If `gog` reports `invalid_grant`, refresh auth first with `gog login jiayuez720081@gmail.com`.
+
 ## Notes
 
 - `startRealExperiment()` resets counters and then starts the next available level.

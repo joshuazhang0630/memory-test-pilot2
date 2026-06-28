@@ -21,7 +21,8 @@ async function fetchManifest(url){
 async function loadManifests(){
     const targetManifest = await fetchManifest(targetManifestUrl);
     const fillerManifest = await fetchManifest(fillerManifestUrl);
-    return { targetManifest: targetManifest, fillerManifest: fillerManifest };
+    const pretrainManifest = await fetchManifest(pretrainManifestUrl);
+    return { targetManifest: targetManifest, fillerManifest: fillerManifest, pretrainManifest: pretrainManifest };
 }
 
 function resolveManifestUrl(base, name){
@@ -40,7 +41,7 @@ function basenameWithoutExt(path){
     return dot > 0 ? base.substring(0, dot) : base;
 }
 
-function buildGlobalRegistry(targetManifest, fillerManifest){
+function buildGlobalRegistry(targetManifest, fillerManifest, pretrainManifest){
     var registry = {
         targets: [],
         fillers: [],
@@ -76,8 +77,21 @@ function buildGlobalRegistry(targetManifest, fillerManifest){
     targetManifest.files.forEach(function(name){ pushRecord("target", name, targetManifest.baseUrl); });
     fillerManifest.files.forEach(function(name){ pushRecord("filler", name, fillerManifest.baseUrl); });
 
-    // pretest sample from fillers (stable deterministic slice)
-    registry.pretest = registry.fillers.slice(0, Math.min(60, registry.fillers.length)).map(function(rec){ return rec.url; });
+    var formalUrls = {};
+    var formalNames = {};
+    registry.targets.concat(registry.fillers).forEach(function(rec){
+        formalUrls[rec.url] = true;
+        formalNames[(rec.fileName || "").split("/").pop()] = true;
+    });
+
+    (pretrainManifest.files || []).forEach(function(name){
+        var fileName = (name || "").split("/").pop();
+        var url = resolveManifestUrl(pretrainManifest.baseUrl, name);
+        if (!fileName || formalUrls[url] || formalNames[fileName]){
+            return;
+        }
+        registry.pretest.push(url);
+    });
     return registry;
 }
 
@@ -196,19 +210,20 @@ function initializeParticipantLevels(participantId){
 function ensureImagesLoaded(){
     if (!imageLoadPromise){
         imageLoadPromise = loadManifests().then(function(payload){
-            var registry = buildGlobalRegistry(payload.targetManifest, payload.fillerManifest);
+            var registry = buildGlobalRegistry(payload.targetManifest, payload.fillerManifest, payload.pretrainManifest);
             manifestData = {
                 registry: registry,
                 levels: {},
                 source: {
                     targetManifest: payload.targetManifest.sourceUrl,
-                    fillerManifest: payload.fillerManifest.sourceUrl
+                    fillerManifest: payload.fillerManifest.sourceUrl,
+                    pretrainManifest: payload.pretrainManifest.sourceUrl
                 }
             };
             pretestImages = registry.pretest.slice();
             availableLevels = [];
             allImagesCatalog = registry.targets.map(function(r){ return r.url; }).concat(registry.fillers.map(function(r){ return r.url; }));
-            console.log("Loaded manifests:", registry.targets.length, "targets", registry.fillers.length, "fillers");
+            console.log("Loaded manifests:", registry.targets.length, "targets", registry.fillers.length, "fillers", registry.pretest.length, "pretrain");
             return manifestData;
         }).catch(function(err){
             console.error("Failed to load manifests", err);
