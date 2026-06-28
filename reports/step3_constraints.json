@@ -10,7 +10,7 @@
       "participant": "p1",
       "level": "1",
       "targetLagMin": 91,
-      "targetLagMax": 109,
+      "targetLagMax": 107,
       "vigilanceLagMin": 1,
       "vigilanceLagMax": 7,
       "badT": 0,
@@ -19,20 +19,20 @@
     {
       "participant": "p1",
       "level": "2",
-      "targetLagMin": 91,
-      "targetLagMax": 109,
+      "targetLagMin": 92,
+      "targetLagMax": 106,
       "vigilanceLagMin": 1,
-      "vigilanceLagMax": 7,
+      "vigilanceLagMax": 6,
       "badT": 0,
       "badV": 0
     },
     {
       "participant": "p2",
       "level": "1",
-      "targetLagMin": 93,
+      "targetLagMin": 92,
       "targetLagMax": 109,
       "vigilanceLagMin": 2,
-      "vigilanceLagMax": 6,
+      "vigilanceLagMax": 7,
       "badT": 0,
       "badV": 0
     },
@@ -41,7 +41,7 @@
       "level": "2",
       "targetLagMin": 91,
       "targetLagMax": 108,
-      "vigilanceLagMin": 2,
+      "vigilanceLagMin": 1,
       "vigilanceLagMax": 7,
       "badT": 0,
       "badV": 0
@@ -49,10 +49,10 @@
     {
       "participant": "p3",
       "level": "1",
-      "targetLagMin": 92,
-      "targetLagMax": 109,
-      "vigilanceLagMin": 1,
-      "vigilanceLagMax": 5,
+      "targetLagMin": 91,
+      "targetLagMax": 107,
+      "vigilanceLagMin": 2,
+      "vigilanceLagMax": 7,
       "badT": 0,
       "badV": 0
     }

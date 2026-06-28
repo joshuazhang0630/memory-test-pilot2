@@ -23,6 +23,13 @@ vm.runInContext(load('utils.js'), ctx);
 vm.runInContext(load('data.js'), ctx);
 vm.runInContext(load('experiment.js'), ctx);
 
+if (process.env.PILOT2_TARGET_MANIFEST_URL) {
+  ctx.targetManifestUrl = process.env.PILOT2_TARGET_MANIFEST_URL;
+}
+if (process.env.PILOT2_FILLER_MANIFEST_URL) {
+  ctx.fillerManifestUrl = process.env.PILOT2_FILLER_MANIFEST_URL;
+}
+
 const TARGET=1, REPEAT=2, FILLER=3, VIGILANCE=4;
 
 function calcLags(seq, types){
