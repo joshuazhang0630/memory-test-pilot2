@@ -1,7 +1,7 @@
 function selectPretrainImages() {
     var pool = pretestImages.slice();
     shuffleArray(pool);
-    return pool.slice(0, Math.min(20, pool.length));
+    return pool.slice(0, Math.min(17, pool.length));
 }
 
 // Build pretrain sequence with repeats
