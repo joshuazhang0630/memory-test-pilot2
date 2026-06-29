@@ -77,7 +77,7 @@ async function showPreSurvey(){
                         </select>
                     </div>
                     <div class="form-element" id="textExperience-container">
-                        <span class="prompt-text spaced-right "><span style="color: #0099CC">*</span> Describe the most complex visualization you have ever seen. What it looks like? Having a link to the image will be helpful but this is not absolutely necessary.</span>
+                        <span class="prompt-text spaced-right "><span style="color: #0099CC">*</span> Describe a visualization that is most impressive you have ever seen. What it looks like? Having a link to the image will be helpful but this is not absolutely necessary.</span>
                         <textarea id="textExperience" name="textExperience" required></textarea>
                     </div>
                     <div class="action-row">

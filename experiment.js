@@ -76,7 +76,9 @@ function showInstructions() {
             </ol>
             <p class="lead-text">
                 Performance monitoring: the system tracks <strong>false alarms</strong> (responding to new images) and <strong>vigilance misses</strong>
-                (missing scheduled repeats). The session ends if you exceed ${facutoff} false alarms or ${vigilancecutoff} vigilance misses.
+                (missing scheduled repeats). False alarms are recorded for data quality. Attention is screened using the most recent
+                ${vigilanceWindowSize} vigilance repeats; the session ends if more than ${Math.round(vigilanceWindowMissThreshold * 100)}%
+                of those repeats are missed.
             </p>
             <p class="lead-text">
                 We begin with a short practice block to ensure the procedure is clear. Practice data are not stored, and all responses
@@ -118,7 +120,7 @@ function startPretrain() {
 			</p>
 			<div class="stimulus-panel">
 				<div id="performancerecord" class="instruction-callout">
-					Press SPACE to begin the practice sequence.
+					Please look at the cross when it appears on the screen. Press SPACE to begin the practice sequence.
 				</div>
 				<div class="stimulus-frame">
 					<img id="stimulus" src="${fixation_address}" alt="Practice stimulus">
@@ -419,15 +421,6 @@ document.onkeydown = function(key){
     }
 };
 
-document.addEventListener('keydown', function(event) {
-	if (!deviceCompatible){
-		return;
-	}
-    if (onBreak && event.key && event.key.toLowerCase() === 'c') {
-        giveBreak(1);
-    }
-});
-
 // preload and then start
 async function buttonPress(){
 	document.getElementById("startbutton").innerHTML = "Experiment Running...";
@@ -458,13 +451,6 @@ function animateSequence(){
 		return;
 	}
 	
-	if (breakCounter >= trialsBetweenBreaks) {
-		giveBreak(0);
-		breakCounter = -1;
-		return;
-	}
-	breakCounter++;
-	
 	imCount++;
 	updateExperimentProgress();
 	if (imCount == fullsequence.length){
@@ -486,8 +472,6 @@ function resetLevelState(){
 	allimgseq = [];
 	performanceseq = [];
 	imCount = -1;
-	breakCounter = 0;
-	onBreak = false;
 	experimentStartTimestamp = null;
 	totalExperimentDuration = 0;
 }
@@ -517,50 +501,6 @@ function preloadEverything() {
 	makeImSequence();
 	calculateTotalPay();
 	buildFullSequence();
-}
-
-// allows the participant to take a break
-function giveBreak(going){
-	if (going){
-		onBreak = false;
-		if (breakCountdownInterval){
-			clearInterval(breakCountdownInterval);
-			breakCountdownInterval = null;
-		}
-		if (breakResumeTimeout){
-			clearTimeout(breakResumeTimeout);
-			breakResumeTimeout = null;
-		}
-		document.getElementById("performancerecord").innerHTML = '';
-		setTimeout(function(){ animateSequence(); }, timesequence[imCount]);
-		return;
-	}
-	onBreak = true;
-	document.getElementById("stimulus").src = fixation_address;
-	breakTimeRemaining = maxBreakTime;
-	document.getElementById("performancerecord").innerHTML = '<h2>Break time!</h2>Good job - you will now get a break. You have <span id="break-countdown">' + breakTimeRemaining + '</span> seconds remaining before the task resumes automatically. Press "<b>C</b>" to continue sooner.';
-	
-	if (breakCountdownInterval){
-		clearInterval(breakCountdownInterval);
-	}
-	breakCountdownInterval = setInterval(function(){
-		breakTimeRemaining = Math.max(0, breakTimeRemaining - 1);
-		var span = document.getElementById("break-countdown");
-		if (span){
-			span.textContent = breakTimeRemaining;
-		}
-		if (breakTimeRemaining <= 0){
-			clearInterval(breakCountdownInterval);
-			breakCountdownInterval = null;
-		}
-	}, 1000);
-	
-	if (breakResumeTimeout){
-		clearTimeout(breakResumeTimeout);
-	}
-	breakResumeTimeout = setTimeout(function(){
-		giveBreak(1);
-	}, maxBreakTime*1000);
 }
 
 // builds the full sequence with both images and fixations, as well as timings
@@ -702,15 +642,26 @@ function determineFailure(){
 		falsealarmcounts++;
 		console.log("False alarm count: " + falsealarmcounts);
 	}
-	if (falsealarmcounts >= facutoff){
-		kickedOut = 1;
-	}
 	
 	if (perfsequence[imCount] == MISS & typesequence[imCount] == VIGILANCE){
 		vigilancefails++;
 		console.log("Vigilance miss count: " + vigilancefails);
 	}
-	if (vigilancefails >= vigilancecutoff){
+
+	var recentVigilance = [];
+	for (var i = imCount; i >= 0 && recentVigilance.length < vigilanceWindowSize; i--){
+		if (typesequence[i] == VIGILANCE){
+			recentVigilance.push(perfsequence[i]);
+		}
+	}
+	if (recentVigilance.length < vigilanceWindowSize){
+		return;
+	}
+	var recentMisses = recentVigilance.filter(function(perf){
+		return perf == MISS;
+	}).length;
+	var missCutoff = Math.floor(vigilanceWindowSize * vigilanceWindowMissThreshold) + 1;
+	if (recentMisses >= missCutoff){
 		kickedOut = 1;
 	}
 }
@@ -1136,8 +1087,6 @@ function makeImSequence(){
 
 // calculate the proportions of targets and foils
 function calculateProps(){
-	var trialtime = stimtime + isi;
-	trialsBetweenBreaks = Math.ceil(timeBetweenBreaks * 1000 / trialtime);
 	var level = manifestData.levels[currentLevelKey] || { targets: [], fillers: [], vigilance: [] };
 	numtargets = level.targets.length;
 	numfoils = level.fillers.length;

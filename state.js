@@ -107,11 +107,8 @@ var vigilanceRepeatMaxGap = 7;
 var keytoWatch = "space"; // use space bar for responses
 var subsperim = 40; // how many subjects you want per image
 var payperhour = 5; // how much money you want to pay per hour
-var vigilancecutoff = 10; // the number of vigilances they're allowed to fail before being booted
-var facutoff = 20; // the number of false alarms they're allowed to make before being booted
-var timeBetweenBreaks = 300; // in seconds
-var maxBreakTime = 15; // in seconds 
-
+var vigilanceWindowSize = 10; // rolling number of vigilance tests used for attention screening
+var vigilanceWindowMissThreshold = 0.5; // block when misses are greater than this proportion
 // text set by the experimenter
 var failuretext = "<h2 class='section-title'>Session Halted</h2><p>You exceeded the permitted error rate. Please submit the session to record participation.</p>";
 var donetext = "<h2 class='section-title'>Session Complete</h2><p>Thank you for your diligence. You may now submit the session for credit.</p>";
@@ -120,9 +117,6 @@ var deviceCompatible = true;
 var totalExperimentDuration = 0;
 var experimentStartTimestamp = null;
 var timerInterval = null;
-var breakCountdownInterval = null;
-var breakTimeRemaining = 0;
-var breakResumeTimeout = null;
 
 // Pretrain variables
 var pretrainImages = []; // Will store URLs of images used for pretrain
@@ -149,7 +143,6 @@ var numtotalsubs = 0;
 var experimentlength = 0;
 var paypersub = 0;
 var totalpay = 0;
-var trialsBetweenBreaks = 0;
 
 // full image sequence variables (these are the whole stream, with fixations built in)
 // deal with these for when running the experiment
@@ -157,8 +150,6 @@ var fullsequence = []; // the sequence of everything (images plus fixation)
 var timesequence = []; // the sequence of the timings
 var typesequence = []; // the sequence of the image types
 var perfsequence = []; // the sequence of the performance
-var breakCounter = 0;
-var onBreak = false;
 
 // image-only sequence variables (the ordering without fixation or anything extra you add in)
 // deal with these when designing the stimulus presentation
