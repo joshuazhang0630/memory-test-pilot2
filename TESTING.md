@@ -30,10 +30,12 @@
 ## Fast-Run Dev Mode 
 Use this to simulate the full flow with very short sequences.
 
+For a browser-driven local run, open `http://localhost:8765/?qa_fast=1`. The flag is ignored on non-local hosts.
+
 1. Enable fast mode and set counts:
    - `devFastMode = true;`
-   - `devPretrainUniqueCount = 1;`
-   - `devPretrainTotalCount = 1;`
+   - `devPretrainUniqueCount = 2;`
+   - `devPretrainTotalCount = 4;`
    - `devLevelTrialCount = 4;` // 4 trials per level (2 images + fixations)
 
 2. Run the normal flow:
@@ -54,6 +56,12 @@ Use this to simulate the full flow with very short sequences.
   - `bash scripts/check_sheet_write.sh`
 
 This posts one smoke row through the same Apps Script backend used by the game, then reads the Google Sheet back with `gog` and prints `backend_sheet_write_ok tag=...` only if the tag is found. If `gog` reports `invalid_grant`, refresh auth first with `gog login jiayuez720081@gmail.com`.
+
+## Data Pipeline Regression Test
+
+- Run `node scripts/check_data_pipeline.js`.
+
+This verifies cross-level sequence separators and event IDs, fixation-grace response attribution, response time and repeat-lag capture, 25-row chunking with verified Apps Script JSON acknowledgements, retained checkpoints after failed uploads, and a single post-survey submit handler.
 
 ## Notes
 

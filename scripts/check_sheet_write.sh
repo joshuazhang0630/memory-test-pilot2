@@ -73,7 +73,7 @@ PY
 curl -fsS -X POST -H "Content-Type: text/plain;charset=utf-8" --data-binary "@$PAYLOAD" "$APPS_URL" >/tmp/sheet_backend_out.txt
 sleep 3
 
-RAW=$(gog sheets get "$SID" "sheet1!A:AO" --json)
+RAW=$(gog sheets get "$SID" "sheet1!A:AP" --json)
 echo "$RAW" > "$REPO/reports/step3_data_integrity.json"
 echo "$RAW" | grep -q "$TAG"
 echo "backend_sheet_write_ok tag=$TAG"

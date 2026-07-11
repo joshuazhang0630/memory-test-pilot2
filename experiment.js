@@ -9,10 +9,12 @@ function buildPretrainSequence() {
     pretrainImages = selectPretrainImages();
 
     if (devFastMode) {
-        pretrainImages = pretrainImages.slice(0, Math.max(1, devPretrainUniqueCount));
-        pretrainSequence = pretrainImages.slice(0, Math.max(1, devPretrainTotalCount));
-        pretrainTypeSequence = pretrainSequence.map(function(){ return TARGET; });
-        pretrainPerfSequence = pretrainSequence.map(function(){ return CORRECTREJECTION; });
+        pretrainImages = pretrainImages.slice(0, Math.max(2, devPretrainUniqueCount));
+        var firstPractice = pretrainImages[0];
+        var secondPractice = pretrainImages[1] || pretrainImages[0];
+        pretrainSequence = [firstPractice, secondPractice, firstPractice, secondPractice];
+        pretrainTypeSequence = [TARGET, TARGET, REPEAT, REPEAT];
+        pretrainPerfSequence = [CORRECTREJECTION, CORRECTREJECTION, MISS, MISS];
         console.log("Pretrain sequence built (dev):", pretrainSequence.length, "images");
         return;
     }
@@ -70,7 +72,7 @@ function showInstructions() {
                 Workflow overview: in Phase 1, mark as many repeated images as you can. In Phase 2, you will evaluate the images you saw in the sequence(s).
             </p>
             <ol class="instruction-list">
-                <li><strong>Attend carefully.</strong> Each visualization appears for 1 second followed by a fixation interval.</li>
+                <li><strong>Attend carefully.</strong> Each visualization appears for ${stimtime / 1000} seconds followed by a fixation interval.</li>
                 <li><strong>Respond only to repeats.</strong> Press the <strong>SPACE BAR</strong> as soon as you recognize a repeated image in the active block.</li>
                 <li><strong>Remain focused.</strong> Repeats may occur long after first exposure and can closely resemble other images.</li>
             </ol>
@@ -95,8 +97,8 @@ function showInstructions() {
 // Dev helper: run a minimal end-to-end flow quickly
 function runFastFlow() {
 	devFastMode = true;
-	devPretrainUniqueCount = 1;
-	devPretrainTotalCount = 1;
+	devPretrainUniqueCount = 2;
+	devPretrainTotalCount = 4;
 	devLevelTrialCount = 4;
 	showInstructions();
 }
@@ -379,6 +381,9 @@ function startRealExperiment() {
 	kickedOut = 0;
     stopAfterLevel = "";
     trialEventRows = [];
+    savedProgressKeys = {};
+    vigilanceHistory = [];
+    submissionInProgress = false;
 
     try {
         initializeParticipantLevels(pid || "anon");
@@ -443,9 +448,10 @@ async function buttonPress(){
 
 // recursive function that shows the images in a sequence
 function animateSequence(){
-	saveProgress();
-	
-	determineFailure();
+	if (imCount > 0 && typesequence[imCount] === FIXATION){
+		finalizeTrialPair(imCount - 1, imCount);
+	}
+
 	if (kickedOut){
 		showFailure();
 		return;
@@ -458,6 +464,7 @@ function animateSequence(){
 		return;
 	}
 	document.getElementById("stimulus").src = fullsequence[imCount];
+	trialOnsetTimestamps[imCount] = Date.now();
 	
 	setTimeout("animateSequence()", timesequence[imCount]);
 }
@@ -474,6 +481,9 @@ function resetLevelState(){
 	imCount = -1;
 	experimentStartTimestamp = null;
 	totalExperimentDuration = 0;
+	trialOnsetTimestamps = [];
+	trialResponseTimes = [];
+	trialResponseWindows = [];
 }
 
 function addToSessionCatalog(list){
@@ -615,45 +625,55 @@ function isResponseKey(event){
 // get the key and respond
 function processResponse(key){
 	if(isResponseKey(key)){
-		var trialtype = typesequence[imCount];
 		if (imCount<0) {
 			document.getElementById("performancerecord").innerHTML = "";
 			if (!inPretrainMode){
 				startExperimentTimer();
 			}
 			animateSequence();
+			return;
 		}
-		if ((trialtype == FIXATION) && imCount > 0) {
-			trialtype = typesequence[imCount-1];
+		var responseIndex = imCount;
+		var responseWindow = "stimulus";
+		if (typesequence[imCount] === FIXATION && imCount > 0) {
+			responseIndex = imCount - 1;
+			responseWindow = "fixation_grace";
 		}
-		if (trialtype == REPEAT | trialtype == VIGILANCE) {
-			perfsequence[imCount] = HIT;
+		var trialtype = typesequence[responseIndex];
+		if (trialResponseTimes[responseIndex] !== undefined){
+			return;
+		}
+		if (trialtype === REPEAT || trialtype === VIGILANCE) {
+			perfsequence[responseIndex] = HIT;
 			console.log("Hit!");
-		} else if (trialtype == TARGET | trialtype == FILLER) {
-			perfsequence[imCount] = FALSEALARM;
+		} else if (trialtype === TARGET || trialtype === FILLER) {
+			perfsequence[responseIndex] = FALSEALARM;
 			console.log("False alarm!");
+		} else {
+			return;
 		}
+		trialResponseTimes[responseIndex] = Math.max(0, Date.now() - (trialOnsetTimestamps[responseIndex] || Date.now()));
+		trialResponseWindows[responseIndex] = responseWindow;
 	}
 }
 
 // decide if they've failed too much
-function determineFailure(){
-	if (perfsequence[imCount] == FALSEALARM){
+function determineFailure(index){
+	var trialIndex = typeof index === "number" ? index : imCount;
+	if (perfsequence[trialIndex] == FALSEALARM){
 		falsealarmcounts++;
 		console.log("False alarm count: " + falsealarmcounts);
 	}
 	
-	if (perfsequence[imCount] == MISS & typesequence[imCount] == VIGILANCE){
+	if (typesequence[trialIndex] == VIGILANCE){
+		vigilanceHistory.push(perfsequence[trialIndex]);
+	}
+	if (perfsequence[trialIndex] === MISS && typesequence[trialIndex] === VIGILANCE){
 		vigilancefails++;
 		console.log("Vigilance miss count: " + vigilancefails);
 	}
 
-	var recentVigilance = [];
-	for (var i = imCount; i >= 0 && recentVigilance.length < vigilanceWindowSize; i--){
-		if (typesequence[i] == VIGILANCE){
-			recentVigilance.push(perfsequence[i]);
-		}
-	}
+	var recentVigilance = vigilanceHistory.slice(-vigilanceWindowSize);
 	if (recentVigilance.length < vigilanceWindowSize){
 		return;
 	}
@@ -709,6 +729,7 @@ function showPostSurvey(){
 			<div class="action-row">
 				<button type="submit" class="primary-button">Submit Session</button>
 			</div>
+			<p id="submission-status" class="small-note" role="status" aria-live="polite"></p>
 		</form>
 	`;
 	document.body.innerHTML = renderShell(content);
@@ -734,11 +755,36 @@ function showPostSurvey(){
 			if (!postForm.reportValidity()){
 				return;
 			}
+			if (submissionInProgress){
+				return;
+			}
+			submissionInProgress = true;
+			var submitButton = postForm.querySelector("button[type='submit']");
+			if (submitButton){
+				submitButton.disabled = true;
+				submitButton.textContent = "Submitting...";
+			}
+			var submitStatus = document.getElementById("submission-status");
+			if (submitStatus){
+				submitStatus.textContent = "Saving all trial and questionnaire data...";
+			}
 			postSurveyResponses.rememberedImage = "";
 			postSurveyResponses.rememberFeaturesA = (document.getElementById("remember-features-a").value || "").trim();
 			postSurveyResponses.rememberFeaturesB = (document.getElementById("remember-features-b").value || "").trim();
 			postSurveyResponses.studyComments = (document.getElementById("study-comments").value || "").trim();
-			await sendToSheets();
+			var submissionResult = await sendToSheets();
+			if (!submissionResult || !submissionResult.ok){
+				submissionInProgress = false;
+				if (submitButton){
+					submitButton.disabled = false;
+					submitButton.textContent = "Retry Submission";
+				}
+				if (submitStatus){
+					submitStatus.textContent = "Data could not be fully saved. Check your connection and retry; do not close this window.";
+					submitStatus.style.color = "var(--error)";
+				}
+				return;
+			}
 			var thanks = `
 				<section class="card text-center">
 					<h1 class="section-title">Submission Received</h1>
@@ -749,10 +795,6 @@ function showPostSurvey(){
 			document.body.innerHTML = renderShell(thanks);
 		};
 		postForm.onsubmit = handlePostSubmit;
-		var submitButton = postForm.querySelector("button[type='submit']");
-		if (submitButton){
-			submitButton.addEventListener("click", handlePostSubmit);
-		}
 	}
 }
 
@@ -1126,6 +1168,24 @@ function imageIdFromUrl(url){
     return dot > 0 ? file.substring(0, dot) : file;
 }
 
+function repeatLagForIndex(index){
+    if (typesequence[index] !== REPEAT && typesequence[index] !== VIGILANCE){
+        return "";
+    }
+    for (var previous = index - 1; previous >= 0; previous--){
+        if (typesequence[previous] !== FIXATION && fullsequence[previous] === fullsequence[index]){
+            var lag = 0;
+            for (var cursor = previous + 1; cursor <= index; cursor++){
+                if (typesequence[cursor] !== FIXATION){
+                    lag++;
+                }
+            }
+            return lag;
+        }
+    }
+    return "";
+}
+
 function collectTrialEvent(index){
     if (index < 0 || index >= fullsequence.length){
         return;
@@ -1141,7 +1201,7 @@ function collectTrialEvent(index){
         user_id: pid || "",
         participant_id: pid || "",
         session_id: currentSessionId || ((pid || "anon") + "-" + (experimentStartTimestamp || Date.now())),
-        study_version: studyVersion || "vis-mem-v2",
+        study_version: studyVersion || "pilot2-v1",
         level_index: Number(currentLevelKey || 0),
         trial_index: index,
         image_id: imageIdFromUrl(fullsequence[index]),
@@ -1151,8 +1211,8 @@ function collectTrialEvent(index){
         expected_response: (typeId === REPEAT || typeId === VIGILANCE) ? 1 : 0,
         participant_response: (perf === HIT || perf === FALSEALARM) ? 1 : 0,
         is_correct: (perf === HIT || perf === CORRECTREJECTION) ? 1 : 0,
-        rt_ms: "",
-        repeat_lag: "",
+        rt_ms: trialResponseTimes[index] === undefined ? "" : trialResponseTimes[index],
+        repeat_lag: repeatLagForIndex(index),
         vigilance_flag: (typeId === VIGILANCE) ? 1 : 0,
         false_alarm_flag: (perf === FALSEALARM) ? 1 : 0,
         hit_flag: (perf === HIT) ? 1 : 0,
@@ -1176,9 +1236,11 @@ function collectTrialEvent(index){
         post_q6: "",
         post_q7: "",
         post_q8: "",
-        client_meta_json: ""
+        client_meta_json: JSON.stringify({
+            response_window: trialResponseWindows[index] || "none"
+        })
     };
-    row.event_id = row.session_id + ":trial:" + row.trial_index;
+    row.event_id = row.session_id + ":level:" + row.level_index + ":trial:" + row.trial_index;
     trialEventRows.push(row);
 
     if (typeof persistTrialCheckpoint === "function" && trialEventRows.length - lastCheckpointTrialCount >= checkpointEveryTrials){
@@ -1187,22 +1249,37 @@ function collectTrialEvent(index){
     }
 }
 
-// save to the output variables the performance and sequence completed so far
-function saveProgress(){
-	if (imCount >= 0 && imCount < fullsequence.length && fullsequence[imCount]) {
-		var tempimg = fullsequence[imCount];
+// Save one sequence entry exactly once. Level is part of the key because indexes reset per level.
+function saveProgress(index){
+	var progressIndex = typeof index === "number" ? index : imCount;
+	var progressKey = String(currentLevelKey || "0") + ":" + progressIndex;
+	if (savedProgressKeys[progressKey]){
+		return;
+	}
+	if (progressIndex >= 0 && progressIndex < fullsequence.length && fullsequence[progressIndex]) {
+		var tempimg = fullsequence[progressIndex];
 		tempimg = tempimg.substring(tempimg.lastIndexOf("/")+1);
-		if (imCount > 0) {
+		if (imgstring.length > 0) {
 			imgstring = imgstring + ",";
 			imtypestring = imtypestring + ",";
 			perfstring = perfstring + ",";
 		}
 		imgstring = imgstring + tempimg;
-		imtypestring = imtypestring + typesequence[imCount];
-		perfstring = perfstring + perfsequence[imCount];
-        collectTrialEvent(imCount);
-		document.getElementById("imseqout").value = imgstring;
-		document.getElementById("imtypeseqout").value = imtypestring;
-		document.getElementById("perfseqout").value = perfstring;
+		imtypestring = imtypestring + typesequence[progressIndex];
+		perfstring = perfstring + perfsequence[progressIndex];
+        collectTrialEvent(progressIndex);
+		var imseqOutput = document.getElementById("imseqout");
+		var imtypeOutput = document.getElementById("imtypeseqout");
+		var perfOutput = document.getElementById("perfseqout");
+		if (imseqOutput){ imseqOutput.value = imgstring; }
+		if (imtypeOutput){ imtypeOutput.value = imtypestring; }
+		if (perfOutput){ perfOutput.value = perfstring; }
+		savedProgressKeys[progressKey] = true;
 	}
+}
+
+function finalizeTrialPair(imageIndex, fixationIndex){
+	saveProgress(imageIndex);
+	saveProgress(fixationIndex);
+	determineFailure(imageIndex);
 }

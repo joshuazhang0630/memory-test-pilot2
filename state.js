@@ -109,6 +109,7 @@ var subsperim = 40; // how many subjects you want per image
 var payperhour = 5; // how much money you want to pay per hour
 var vigilanceWindowSize = 10; // rolling number of vigilance tests used for attention screening
 var vigilanceWindowMissThreshold = 0.5; // block when misses are greater than this proportion
+
 // text set by the experimenter
 var failuretext = "<h2 class='section-title'>Session Halted</h2><p>You exceeded the permitted error rate. Please submit the session to record participation.</p>";
 var donetext = "<h2 class='section-title'>Session Complete</h2><p>Thank you for your diligence. You may now submit the session for credit.</p>";
@@ -171,6 +172,15 @@ var trialEventRows = [];
 var currentSessionId = "";
 var checkpointEveryTrials = 20;
 var lastCheckpointTrialCount = 0;
+var trialOnsetTimestamps = [];
+var trialResponseTimes = [];
+var trialResponseWindows = [];
+var savedProgressKeys = {};
+var vigilanceHistory = [];
+var submissionInProgress = false;
+var sheetAppsUrl = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec";
+var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
+var sheetWorksheetName = "sheet1";
 
 // Dev/test helpers (set in console)
 var devFastMode = false;

@@ -191,7 +191,7 @@ function validateRows(rows){
     if (!rows || !rows.length){
         return { ok: false, reason: "no_rows" };
     }
-    var required = ["event_type", "timestamp_iso", "session_id", "study_version"];
+    var required = ["event_type", "event_id", "timestamp_iso", "session_id", "study_version"];
     for (var i = 0; i < rows.length; i++){
         for (var j = 0; j < required.length; j++){
             if (rows[i][required[j]] === undefined || rows[i][required[j]] === null){
@@ -202,44 +202,66 @@ function validateRows(rows){
     return { ok: true };
 }
 
-function postPayload(appsURL, payload){
-    return fetch(appsURL, {
+async function postPayload(appsURL, payload){
+    var response = await fetch(appsURL, {
         method: "POST",
-        mode: "no-cors",
-        keepalive: true,
-        headers: {"Content-Type": "application/json"},
+        mode: "cors",
+        redirect: "follow",
+        headers: {"Content-Type": "text/plain;charset=utf-8"},
         body: JSON.stringify(payload)
     });
+    if (!response.ok){
+        throw new Error("sheet_http_" + response.status);
+    }
+    var result = await response.json();
+    if (!result || result.ok !== true){
+        throw new Error("sheet_rejected_payload");
+    }
+    if (Array.isArray(payload.rows)){
+        var received = Number(result.received);
+        var appended = Number(result.appended);
+        var duplicates = Number(result.duplicates);
+        if (received !== payload.rows.length || appended + duplicates !== received){
+            throw new Error("sheet_ack_mismatch");
+        }
+    }
+    return result;
 }
 
 async function postWithRetries(appsURL, payload, attempts){
+    var lastError = null;
     for (var i = 0; i < attempts; i++){
         try {
-            await postPayload(appsURL, payload);
-            return true;
+            var result = await postPayload(appsURL, payload);
+            return { ok: true, result: result };
         } catch (e){
+            lastError = e;
             if (i === attempts - 1){
                 console.error("send failed", e);
+            } else {
+                await new Promise(function(resolve){ setTimeout(resolve, 250 * (i + 1)); });
             }
         }
     }
-    try {
-        if (navigator.sendBeacon){
-            var ok = navigator.sendBeacon(appsURL, new Blob([JSON.stringify(payload)], { type: "application/json" }));
-            if (ok){
-                return true;
-            }
-        }
-    } catch (e2){
-        console.error("beacon failed", e2);
+    return { ok: false, error: lastError };
+}
+
+function formattedGenderResponse(){
+    var values = [];
+    if (preSurveyResponses.gender){
+        values.push(preSurveyResponses.gender);
     }
-    return false;
+    if (preSurveyResponses.genderSelf){
+        values.push("self:" + preSurveyResponses.genderSelf);
+    }
+    return values.join("|");
 }
 
 async function sendToSheets() {
 	const form = document.getElementById('form');
-    const formData = new FormData(form);
-    const appsURL = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec";
+    const formData = form ? new FormData(form) : null;
+    const formFields = formData ? Object.fromEntries(formData.entries()) : {};
+    const appsURL = sheetAppsUrl;
 
     const baseMeta = {
         user_id: pid,
@@ -251,7 +273,7 @@ async function sendToSheets() {
         pre_survey_submitted: preSurveyResponses && preSurveyResponses.workerId ? 1 : 0,
         post_survey_submitted: 1,
         pre_q1: preSurveyResponses.takenBefore || "",
-        pre_q2: preSurveyResponses.gender || "",
+        pre_q2: formattedGenderResponse(),
         pre_q3: preSurveyResponses.age || "",
         pre_q4: preSurveyResponses.education || "",
         pre_q5: preSurveyResponses.complexVizDesc || "",
@@ -280,13 +302,20 @@ async function sendToSheets() {
         merged.pre_q3 = baseMeta.pre_q3;
         merged.pre_q4 = baseMeta.pre_q4;
         merged.pre_q5 = baseMeta.pre_q5;
-        merged.event_id = merged.event_id || (baseMeta.session_id + ":trial:" + merged.trial_index);
-        merged.client_meta_json = JSON.stringify({
+        merged.event_id = merged.event_id || (baseMeta.session_id + ":level:" + merged.level_index + ":trial:" + merged.trial_index);
+        var existingClientMeta = {};
+        try {
+            existingClientMeta = merged.client_meta_json ? JSON.parse(merged.client_meta_json) : {};
+        } catch (e){
+            existingClientMeta = {};
+        }
+        merged.client_meta_json = JSON.stringify(Object.assign({}, existingClientMeta, {
             vigilancefails: vigilancefails,
             falsealarmcounts: falsealarmcounts,
             ending: endingStatus || document.getElementById("endingout").value || "",
-            source: "trial"
-        });
+            source: "trial",
+            gender_self: preSurveyResponses.genderSelf || ""
+        }));
         return merged;
     });
 
@@ -341,7 +370,7 @@ async function sendToSheets() {
             falsealarmcounts: falsealarmcounts,
             pre_raw: preSurveyResponses,
             post_raw: postSurveyResponses,
-            form_fields: Object.fromEntries(formData.entries())
+            form_fields: formFields
         })
     };
 
@@ -350,17 +379,19 @@ async function sendToSheets() {
     if (!check.ok){
         console.error("payload validation failed", check.reason);
         alert("Submission blocked: " + check.reason + ". Please refresh and retry.");
-        return;
+        return { ok: false, reason: check.reason };
     }
 
-    // chunk rows to reduce chance of payload loss
-    var chunkSize = 120;
+    // Keep every request well below browser keepalive/beacon limits. Normal fetch is used so
+    // the Apps Script JSON acknowledgement can be verified before showing success.
+    var chunkSize = 25;
     var okAll = true;
+    var acceptedChunks = [];
     for (var start = 0; start < allRows.length; start += chunkSize){
         var chunk = allRows.slice(start, start + chunkSize);
         const payload = {
-            spreadsheet_id: "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY",
-            worksheet_name: "sheet1",
+            spreadsheet_id: sheetSpreadsheetId,
+            worksheet_name: sheetWorksheetName,
             schema_version: "v2",
             rows: chunk,
             chunk_index: Math.floor(start / chunkSize),
@@ -383,8 +414,12 @@ async function sendToSheets() {
             post_remember_features_b: postSurveyResponses.rememberFeaturesB,
             post_study_comments: postSurveyResponses.studyComments
         };
-        var ok = await postWithRetries(appsURL, payload, 3);
-        okAll = okAll && ok;
+        var postResult = await postWithRetries(appsURL, payload, 3);
+        if (!postResult.ok){
+            okAll = false;
+            break;
+        }
+        acceptedChunks.push(postResult.result);
     }
 
     persistTrialCheckpoint();
@@ -392,5 +427,10 @@ async function sendToSheets() {
         localStorage.removeItem("pilot2_checkpoint_" + getSessionId());
     }
     console.log(okAll ? "Data sent to Google Sheets!" : "Data submission may be partial; checkpoint saved locally.");
+    return {
+        ok: okAll,
+        rows: allRows.length,
+        chunks: acceptedChunks.length,
+        acknowledgements: acceptedChunks
+    };
 }
-

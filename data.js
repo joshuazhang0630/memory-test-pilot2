@@ -153,17 +153,22 @@ function initializeParticipantLevels(participantId){
     var shuffledTargets = shuffleWithRng(manifestData.registry.targets, rng);
     var shuffledFillers = shuffleWithRng(manifestData.registry.fillers, rng);
 
+    var effectiveLevelTrialCount = levelTrialCount;
+    if (typeof devFastMode !== "undefined" && devFastMode){
+        effectiveLevelTrialCount = Math.max(2, devLevelTrialCount);
+    }
+
     // Per-level design budget (must fit levelTrialCount and lag constraints)
     var targetPairsPerLevel = 16; // production default
     var vigilancePairsPerLevel = 6; // production default
 
     // Dev fast mode guard: shrink pair counts so tiny trial counts can still build sequences
-    if (typeof devFastMode !== "undefined" && devFastMode && levelTrialCount <= 40){
-        targetPairsPerLevel = Math.max(1, Math.floor(levelTrialCount * 0.15));
-        vigilancePairsPerLevel = Math.max(1, Math.floor(levelTrialCount * 0.05));
+    if (typeof devFastMode !== "undefined" && devFastMode && effectiveLevelTrialCount <= 40){
+        targetPairsPerLevel = Math.max(1, Math.floor(effectiveLevelTrialCount * 0.15));
+        vigilancePairsPerLevel = effectiveLevelTrialCount <= 6 ? 0 : Math.max(1, Math.floor(effectiveLevelTrialCount * 0.05));
     }
 
-    var fillerSinglesPerLevel = Math.max(0, levelTrialCount - (targetPairsPerLevel * 2) - (vigilancePairsPerLevel * 2));
+    var fillerSinglesPerLevel = Math.max(0, effectiveLevelTrialCount - (targetPairsPerLevel * 2) - (vigilancePairsPerLevel * 2));
 
     var neededTargets = targetPairsPerLevel * levelCount;
     var neededVigilance = vigilancePairsPerLevel * levelCount;
