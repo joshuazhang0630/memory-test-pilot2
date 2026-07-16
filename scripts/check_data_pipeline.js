@@ -89,6 +89,13 @@ function resetSession() {
   ctx.imgstring = '';
   ctx.imtypestring = '';
   ctx.perfstring = '';
+  ctx.sequenceContext = {
+    algorithm: 'pilot2-session-sequence-v2',
+    seedInput: 'pipeline-seed-input',
+    seedHash: 'a1b2c3d4',
+    assignmentHash: 'e5f60718',
+    levelSequenceHashes: { '1': '11111111', '2': '22222222' },
+  };
   ctx.preSurveyResponses = {
     workerId: 'QA_PIPELINE',
     takenBefore: 'no',
@@ -164,7 +171,12 @@ async function main() {
   assert.strictEqual(ctx.trialEventRows.length, 1);
   assert.strictEqual(ctx.trialEventRows[0].participant_response, 1);
   assert.strictEqual(ctx.trialEventRows[0].false_alarm_flag, 1);
-  assert.strictEqual(JSON.parse(ctx.trialEventRows[0].client_meta_json).response_window, 'fixation_grace');
+  const trialMeta = JSON.parse(ctx.trialEventRows[0].client_meta_json);
+  assert.strictEqual(trialMeta.response_window, 'fixation_grace');
+  assert.strictEqual(trialMeta.sequence_algorithm, 'pilot2-session-sequence-v2');
+  assert.strictEqual(trialMeta.sequence_seed_hash, 'a1b2c3d4');
+  assert.strictEqual(trialMeta.assignment_hash, 'e5f60718');
+  assert.strictEqual(trialMeta.level_sequence_hash, '11111111');
 
   ctx.fullsequence = ['A.png', ctx.fixation_address, 'B.png', ctx.fixation_address, 'A.png', ctx.fixation_address];
   ctx.typesequence = [1, 0, 3, 0, 2, 0];
@@ -235,6 +247,13 @@ async function main() {
   assert(requests.every(request => request.options.headers['Content-Type'] === 'text/plain;charset=utf-8'));
   assert.strictEqual(requests.reduce((sum, request) => sum + request.payload.rows.length, 0), 241);
   assert.strictEqual(requests[0].payload.rows[0].pre_q2, 'other|self:pipeline-self-description');
+  const sentRows = requests.flatMap(request => request.payload.rows);
+  const summaryRow = sentRows.find(row => row.event_type === 'session_end');
+  const summaryMeta = JSON.parse(summaryRow.client_meta_json);
+  assert.strictEqual(summaryMeta.sequence_algorithm, 'pilot2-session-sequence-v2');
+  assert.strictEqual(summaryMeta.sequence_seed_hash, 'a1b2c3d4');
+  assert.strictEqual(summaryMeta.assignment_hash, 'e5f60718');
+  assert.deepStrictEqual(summaryMeta.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
 
   localData.clear();
   let failedRequests = 0;
@@ -246,6 +265,11 @@ async function main() {
   assert.strictEqual(failure.ok, false);
   assert.strictEqual(failedRequests, 3);
   assert(localData.has('pilot2_checkpoint_QA_PIPELINE-session'));
+  const checkpoint = JSON.parse(localData.get('pilot2_checkpoint_QA_PIPELINE-session'));
+  assert.strictEqual(checkpoint.sequence_algorithm, 'pilot2-session-sequence-v2');
+  assert.strictEqual(checkpoint.sequence_seed_hash, 'a1b2c3d4');
+  assert.strictEqual(checkpoint.assignment_hash, 'e5f60718');
+  assert.deepStrictEqual(checkpoint.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');
@@ -258,6 +282,9 @@ async function main() {
       uniqueCrossLevelEventIds: true,
       fixationResponseMappedToImage: true,
       repeatLagCalculated: true,
+      sequenceMetadataInTrials: true,
+      sequenceMetadataInSummary: true,
+      sequenceMetadataInCheckpoint: true,
       productionRows: success.rows,
       productionChunks: success.chunks,
       verifiedJsonAcknowledgement: true,

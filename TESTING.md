@@ -63,6 +63,14 @@ This posts one smoke row through the same Apps Script backend used by the game, 
 
 This verifies cross-level sequence separators and event IDs, fixation-grace response attribution, response time and repeat-lag capture, 25-row chunking with verified Apps Script JSON acknowledgements, retained checkpoints after failed uploads, and a single post-survey submit handler.
 
+## Session Sequence Constraint Test
+
+- Run `node scripts/check_constraints.js`.
+
+This builds 200 synthetic logins for the same participant. It verifies that every login receives a distinct target/filler assignment and image ordering, while replaying the same participant/session seed exactly reproduces the sequence. It also checks complete 32-target/164-filler catalog coverage, cross-level disjointness, per-level 16-target/6-vigilance/76-filler-single counts, target lag 91–109, vigilance lag 1–7, and the absence of null slots or sequence build errors.
+
+The formal experiment is seeded per session; practice remains independently randomized. Runtime level assignment comes from the manifests and session seed. Dataset CSV level/position fields are audit metadata and do not fix runtime placement.
+
 ## Notes
 
 - `startRealExperiment()` resets counters and then starts the next available level.

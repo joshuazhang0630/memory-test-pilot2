@@ -179,7 +179,11 @@ function persistTrialCheckpoint(){
             updated_at: new Date().toISOString(),
             trial_rows_count: (trialEventRows || []).length,
             trial_rows: (trialEventRows || []).slice(-200),
-            ending_status: endingStatus || ""
+            ending_status: endingStatus || "",
+            sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
+            sequence_seed_hash: sequenceContext.seedHash || "",
+            assignment_hash: sequenceContext.assignmentHash || "",
+            level_sequence_hashes: Object.assign({}, sequenceContext.levelSequenceHashes || {})
         };
         localStorage.setItem("pilot2_checkpoint_" + getSessionId(), JSON.stringify(payload));
     } catch (e){
@@ -368,6 +372,10 @@ async function sendToSheets() {
             ending: endingStatus || document.getElementById("endingout").value || "",
             vigilancefails: vigilancefails,
             falsealarmcounts: falsealarmcounts,
+            sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
+            sequence_seed_hash: sequenceContext.seedHash || "",
+            assignment_hash: sequenceContext.assignmentHash || "",
+            level_sequence_hashes: Object.assign({}, sequenceContext.levelSequenceHashes || {}),
             pre_raw: preSurveyResponses,
             post_raw: postSurveyResponses,
             form_fields: formFields

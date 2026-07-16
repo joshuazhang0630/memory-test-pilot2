@@ -104,6 +104,10 @@ function hashString(str){
     return h >>> 0;
 }
 
+function hashHex(str){
+    return hashString(String(str || "")).toString(16).padStart(8, "0");
+}
+
 function makeSeededRng(seed){
     var s = seed >>> 0;
     return function(){
@@ -126,6 +130,13 @@ function shuffleWithRng(arr, rng){
     return a;
 }
 
+function makeSequenceRng(label){
+    if (!sequenceContext || !sequenceContext.seedInput){
+        throw new Error("Session sequence seed has not been initialized");
+    }
+    return makeSeededRng(hashString(sequenceContext.seedInput + "|" + label));
+}
+
 function splitIntoLevels(items, levelCount){
     var levels = [];
     for (var i = 0; i < levelCount; i++){
@@ -137,7 +148,7 @@ function splitIntoLevels(items, levelCount){
     return levels;
 }
 
-function initializeParticipantLevels(participantId){
+function initializeParticipantLevels(participantId, sessionId){
     if (!manifestData || !manifestData.registry){
         throw new Error("Manifest registry not loaded");
     }
@@ -147,11 +158,27 @@ function initializeParticipantLevels(participantId){
         levelKeys.push(String(i));
     }
 
-    var seedInput = "pilot2-fixed-level-pools|" + (studyVersion || "pilot2-v1") + "|" + (studySalt || "salt");
-    var rng = makeSeededRng(hashString(seedInput));
+    var normalizedParticipantId = String(participantId || "anon");
+    var normalizedSessionId = String(sessionId || currentSessionId || (normalizedParticipantId + "-session"));
+    var seedInput = [
+        sequenceAlgorithm || "pilot2-session-sequence-v2",
+        studyVersion || "pilot2-v1",
+        studySalt || "salt",
+        normalizedParticipantId,
+        normalizedSessionId
+    ].join("|");
+    sequenceContext = {
+        algorithm: sequenceAlgorithm || "pilot2-session-sequence-v2",
+        seedInput: seedInput,
+        seedHash: hashHex(seedInput),
+        assignmentHash: "",
+        levelSequenceHashes: {}
+    };
 
-    var shuffledTargets = shuffleWithRng(manifestData.registry.targets, rng);
-    var shuffledFillers = shuffleWithRng(manifestData.registry.fillers, rng);
+    var targetRng = makeSequenceRng("target-pool");
+    var fillerRng = makeSequenceRng("filler-pool");
+    var shuffledTargets = shuffleWithRng(manifestData.registry.targets, targetRng);
+    var shuffledFillers = shuffleWithRng(manifestData.registry.fillers, fillerRng);
 
     var effectiveLevelTrialCount = levelTrialCount;
     if (typeof devFastMode !== "undefined" && devFastMode){
@@ -202,7 +229,19 @@ function initializeParticipantLevels(participantId){
         };
     });
 
+    var assignmentParts = [];
+    levelKeys.forEach(function(levelKey){
+        var level = levels[levelKey];
+        assignmentParts.push(
+            levelKey + "|targets|" + level.targets.join(",") +
+            "|vigilance|" + level.vigilance.join(",") +
+            "|fillers|" + level.fillers.join(",")
+        );
+    });
+    sequenceContext.assignmentHash = hashHex(assignmentParts.join("||"));
+
     manifestData.levels = levels;
+    manifestData.sequenceContext = sequenceContext;
     availableLevels = levelKeys.slice();
     allImagesCatalog = [];
     availableLevels.forEach(function(levelKey){

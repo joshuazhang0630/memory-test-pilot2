@@ -62,7 +62,15 @@ var targetManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/target/manife
 var fillerManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/filler/manifest.json";
 var pretrainManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/pretrain/manifest.json";
 var studyVersion = "pilot2-v1";
-var studySalt = "pilot2-fixed-pools";
+var studySalt = "pilot2-session-randomized-v2";
+var sequenceAlgorithm = "pilot2-session-sequence-v2";
+var sequenceContext = {
+    algorithm: sequenceAlgorithm,
+    seedInput: "",
+    seedHash: "",
+    assignmentHash: "",
+    levelSequenceHashes: {}
+};
 var activeLevelCount = 2;
 var images = [];
 var allImagesCatalog = [];

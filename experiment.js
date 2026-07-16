@@ -386,7 +386,7 @@ function startRealExperiment() {
     submissionInProgress = false;
 
     try {
-        initializeParticipantLevels(pid || "anon");
+        initializeParticipantLevels(pid || "anon", currentSessionId);
     } catch (err){
         console.error("Failed to initialize participant levels", err);
         document.body.innerHTML = renderShell("<section class='card'><h1 class='section-title'>Unable to start experiment</h1><p class='lead-text'>Could not initialize participant-specific levels. Please refresh and try again.</p></section>");
@@ -925,8 +925,9 @@ function showEnding(){
 
 // create the memorability-based image sequence
 
-function randomInt(min, max){
-	return Math.floor(Math.random() * (max - min + 1)) + min;
+function randomInt(min, max, rng){
+	var randomSource = typeof rng === "function" ? rng : Math.random;
+	return Math.floor(randomSource() * (max - min + 1)) + min;
 }
 
 function findPairWithDelay(slots, minDelay, maxDelay){
@@ -1014,9 +1015,10 @@ function buildLevelSequence(levelKey){
 	if (!level){
 		throw new Error("Missing level data for " + levelKey);
 	}
-	var targets = shuffleArray(level.targets.slice());
-	var fillers = shuffleArray(level.fillers.slice());
-	var vigilance = shuffleArray(level.vigilance.slice());
+	var rng = makeSequenceRng("level-sequence-" + levelKey);
+	var targets = shuffleWithRng(level.targets, rng);
+	var fillers = shuffleWithRng(level.fillers, rng);
+	var vigilance = shuffleWithRng(level.vigilance, rng);
 	var totalSlots = levelTrialCount;
 
 	function tryBuildOnce(){
@@ -1036,12 +1038,12 @@ function buildLevelSequence(levelKey){
 			var item = targets[t];
 			var placed = false;
 			for (var attempt = 0; attempt < 400; attempt++){
-				var lag = randomInt(targetLagMin, targetLagMax);
+				var lag = randomInt(targetLagMin, targetLagMax, rng);
 				var maxFirst = totalSlots - lag - 1;
 				if (maxFirst < 0){
 					break;
 				}
-				var first = randomInt(0, maxFirst);
+				var first = randomInt(0, maxFirst, rng);
 				var second = first + lag;
 				if (slots[first] === null && slots[second] === null){
 					slots[first] = item;
@@ -1064,12 +1066,12 @@ function buildLevelSequence(levelKey){
 			var vItem = vigilance[v];
 			var vPlaced = false;
 			for (var vAttempt = 0; vAttempt < 400; vAttempt++){
-				var vLag = randomInt(1, vigilanceRepeatMaxGap);
+				var vLag = randomInt(1, vigilanceRepeatMaxGap, rng);
 				var vMaxFirst = totalSlots - vLag - 1;
 				if (vMaxFirst < 0){
 					break;
 				}
-				var vFirst = randomInt(0, vMaxFirst);
+				var vFirst = randomInt(0, vMaxFirst, rng);
 				var vSecond = vFirst + vLag;
 				if (slots[vFirst] === null && slots[vSecond] === null){
 					slots[vFirst] = vItem;
@@ -1094,7 +1096,7 @@ function buildLevelSequence(levelKey){
 				fillerSingles.push(fillers[f]);
 			}
 		}
-		fillerSingles = shuffleArray(fillerSingles);
+		fillerSingles = shuffleWithRng(fillerSingles, rng);
 		var fillCursor = 0;
 		for (var i = 0; i < totalSlots; i++){
 			if (slots[i] === null){
@@ -1113,6 +1115,9 @@ function buildLevelSequence(levelKey){
 	for (var tries = 0; tries < 240; tries++){
 		var built = tryBuildOnce();
 		if (built){
+			built.sequenceHash = hashHex(
+				String(levelKey) + "|" + built.sequence.join(",") + "|" + built.types.join(",")
+			);
 			return built;
 		}
 	}
@@ -1124,6 +1129,9 @@ function makeImSequence(){
 	allimgseq = built.sequence.slice();
 	imtypeseq = built.types.slice();
 	performanceseq = built.perf.slice();
+	if (sequenceContext && sequenceContext.levelSequenceHashes){
+		sequenceContext.levelSequenceHashes[String(currentLevelKey)] = built.sequenceHash;
+	}
 	console.log("Done making the image sequence for level", currentLevelKey, "with", allimgseq.length, "trials.");
 }
 
@@ -1237,7 +1245,11 @@ function collectTrialEvent(index){
         post_q7: "",
         post_q8: "",
         client_meta_json: JSON.stringify({
-            response_window: trialResponseWindows[index] || "none"
+            response_window: trialResponseWindows[index] || "none",
+            sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
+            sequence_seed_hash: sequenceContext.seedHash || "",
+            assignment_hash: sequenceContext.assignmentHash || "",
+            level_sequence_hash: (sequenceContext.levelSequenceHashes || {})[String(currentLevelKey)] || ""
         })
     };
     row.event_id = row.session_id + ":level:" + row.level_index + ":trial:" + row.trial_index;

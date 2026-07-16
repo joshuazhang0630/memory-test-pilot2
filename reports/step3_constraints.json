@@ -1,5 +1,16 @@
 {
-  "participants": 50,
+  "sessions": 200,
+  "algorithm": "pilot2-session-sequence-v2",
+  "targetCatalogSize": 32,
+  "fillerCatalogSize": 164,
+  "uniqueSessionSequenceHashes": 200,
+  "duplicateSessionSequenceHashes": 0,
+  "sameSessionReproductionMismatches": 0,
+  "targetLevelVariationViolations": 0,
+  "fillerLevelVariationViolations": 0,
+  "targetPositionVariationViolations": 0,
+  "catalogCoverageViolations": 0,
+  "roleCountViolations": 0,
   "overlapViolations": 0,
   "targetLagViolations": 0,
   "vigilanceLagViolations": 0,
@@ -7,54 +18,115 @@
   "sequenceBuildErrors": 0,
   "samples": [
     {
-      "participant": "p1",
-      "level": "1",
-      "targetLagMin": 91,
-      "targetLagMax": 107,
-      "vigilanceLagMin": 1,
-      "vigilanceLagMax": 7,
-      "badT": 0,
-      "badV": 0
+      "sessionId": "synthetic-login-user-login-001",
+      "seedHash": "e46702c5",
+      "assignmentHash": "e3e2b81a",
+      "levels": {
+        "1": {
+          "sequenceHash": "b6c77d50",
+          "targetLagMin": 91,
+          "targetLagMax": 107,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 7
+        },
+        "2": {
+          "sequenceHash": "a0aa6529",
+          "targetLagMin": 91,
+          "targetLagMax": 106,
+          "vigilanceLagMin": 2,
+          "vigilanceLagMax": 7
+        }
+      },
+      "sessionSequenceHash": "1d8d970d"
     },
     {
-      "participant": "p1",
-      "level": "2",
-      "targetLagMin": 92,
-      "targetLagMax": 106,
-      "vigilanceLagMin": 1,
-      "vigilanceLagMax": 6,
-      "badT": 0,
-      "badV": 0
+      "sessionId": "synthetic-login-user-login-002",
+      "seedHash": "e166fe0c",
+      "assignmentHash": "930cbfda",
+      "levels": {
+        "1": {
+          "sequenceHash": "21c9c7fd",
+          "targetLagMin": 92,
+          "targetLagMax": 106,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 5
+        },
+        "2": {
+          "sequenceHash": "aaefcbc2",
+          "targetLagMin": 92,
+          "targetLagMax": 109,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 7
+        }
+      },
+      "sessionSequenceHash": "4023170a"
     },
     {
-      "participant": "p2",
-      "level": "1",
-      "targetLagMin": 92,
-      "targetLagMax": 109,
-      "vigilanceLagMin": 2,
-      "vigilanceLagMax": 7,
-      "badT": 0,
-      "badV": 0
+      "sessionId": "synthetic-login-user-login-003",
+      "seedHash": "e266ff9f",
+      "assignmentHash": "4092f22f",
+      "levels": {
+        "1": {
+          "sequenceHash": "508021f4",
+          "targetLagMin": 91,
+          "targetLagMax": 107,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 7
+        },
+        "2": {
+          "sequenceHash": "c67ac766",
+          "targetLagMin": 91,
+          "targetLagMax": 108,
+          "vigilanceLagMin": 4,
+          "vigilanceLagMax": 7
+        }
+      },
+      "sessionSequenceHash": "21d44bc3"
     },
     {
-      "participant": "p2",
-      "level": "2",
-      "targetLagMin": 91,
-      "targetLagMax": 108,
-      "vigilanceLagMin": 1,
-      "vigilanceLagMax": 7,
-      "badT": 0,
-      "badV": 0
+      "sessionId": "synthetic-login-user-login-004",
+      "seedHash": "df66fae6",
+      "assignmentHash": "94e16dba",
+      "levels": {
+        "1": {
+          "sequenceHash": "7cd71b25",
+          "targetLagMin": 91,
+          "targetLagMax": 109,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 4
+        },
+        "2": {
+          "sequenceHash": "c195983a",
+          "targetLagMin": 91,
+          "targetLagMax": 109,
+          "vigilanceLagMin": 3,
+          "vigilanceLagMax": 5
+        }
+      },
+      "sessionSequenceHash": "9b294142"
     },
     {
-      "participant": "p3",
-      "level": "1",
-      "targetLagMin": 91,
-      "targetLagMax": 107,
-      "vigilanceLagMin": 2,
-      "vigilanceLagMax": 7,
-      "badT": 0,
-      "badV": 0
+      "sessionId": "synthetic-login-user-login-005",
+      "seedHash": "e066fc79",
+      "assignmentHash": "2cae1424",
+      "levels": {
+        "1": {
+          "sequenceHash": "338261b9",
+          "targetLagMin": 92,
+          "targetLagMax": 105,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 7
+        },
+        "2": {
+          "sequenceHash": "edf09000",
+          "targetLagMin": 93,
+          "targetLagMax": 109,
+          "vigilanceLagMin": 1,
+          "vigilanceLagMax": 7
+        }
+      },
+      "sessionSequenceHash": "fc844854"
     }
-  ]
+  ],
+  "allChecksPassed": true
 }
