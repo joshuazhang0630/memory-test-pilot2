@@ -16,7 +16,7 @@ function jsonOut(obj) {
 
 function ensureSheet(ssId, wsName) {
   const ss = SpreadsheetApp.openById(ssId);
-  const sh = ss.getSheetByName(wsName) || ss.getSheetByName("sheet1") || ss.getSheets()[0];
+  const sh = ss.getSheetByName(wsName) || ss.getSheetByName("raw_events") || ss.getSheetByName("sheet1") || ss.getSheets()[0];
   if (sh.getMaxColumns() < HEADERS.length) {
     sh.insertColumnsAfter(sh.getMaxColumns(), HEADERS.length - sh.getMaxColumns());
   }
@@ -79,7 +79,7 @@ function doPost(e) {
     const body = e && e.postData && e.postData.contents ? e.postData.contents : "{}";
     const payload = JSON.parse(body);
     const ssId = payload.spreadsheet_id || "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
-    const worksheet = payload.worksheet_name || "sheet1";
+    const worksheet = payload.worksheet_name || "raw_events";
     const sh = ensureSheet(ssId, worksheet);
     const receivedRows = Array.isArray(payload.rows) && payload.rows.length
       ? payload.rows

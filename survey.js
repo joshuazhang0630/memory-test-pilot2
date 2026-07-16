@@ -180,6 +180,10 @@ function persistTrialCheckpoint(){
             trial_rows_count: (trialEventRows || []).length,
             trial_rows: (trialEventRows || []).slice(-200),
             ending_status: endingStatus || "",
+            run_mode: currentRunMode(),
+            schema_version: eventSchemaVersion,
+            stimulus_catalog_version: stimulusCatalogVersion,
+            client_build_id: clientBuildId,
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
             assignment_hash: sequenceContext.assignmentHash || "",
@@ -318,6 +322,10 @@ async function sendToSheets() {
             falsealarmcounts: falsealarmcounts,
             ending: endingStatus || document.getElementById("endingout").value || "",
             source: "trial",
+            run_mode: currentRunMode(),
+            schema_version: eventSchemaVersion,
+            stimulus_catalog_version: stimulusCatalogVersion,
+            client_build_id: clientBuildId,
             gender_self: preSurveyResponses.genderSelf || ""
         }));
         return merged;
@@ -372,6 +380,10 @@ async function sendToSheets() {
             ending: endingStatus || document.getElementById("endingout").value || "",
             vigilancefails: vigilancefails,
             falsealarmcounts: falsealarmcounts,
+            run_mode: currentRunMode(),
+            schema_version: eventSchemaVersion,
+            stimulus_catalog_version: stimulusCatalogVersion,
+            client_build_id: clientBuildId,
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
             assignment_hash: sequenceContext.assignmentHash || "",
@@ -400,7 +412,7 @@ async function sendToSheets() {
         const payload = {
             spreadsheet_id: sheetSpreadsheetId,
             worksheet_name: sheetWorksheetName,
-            schema_version: "v2",
+            schema_version: eventSchemaVersion,
             rows: chunk,
             chunk_index: Math.floor(start / chunkSize),
             chunk_total: Math.ceil(allRows.length / chunkSize),

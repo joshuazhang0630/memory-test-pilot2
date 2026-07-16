@@ -59,8 +59,8 @@ row = {
 }
 payload = {
     "spreadsheet_id": sid,
-    "worksheet_name": "sheet1",
-    "schema_version": "v2",
+    "worksheet_name": "raw_events",
+    "schema_version": "pilot2-event-v2",
     "rows": [row],
     "chunk_index": 0,
     "chunk_total": 1,
@@ -73,7 +73,7 @@ PY
 curl -fsS -X POST -H "Content-Type: text/plain;charset=utf-8" --data-binary "@$PAYLOAD" "$APPS_URL" >/tmp/sheet_backend_out.txt
 sleep 3
 
-RAW=$(gog sheets get "$SID" "sheet1!A:AP" --json)
+RAW=$(gog sheets get "$SID" "raw_events!A:AP" --json)
 echo "$RAW" > "$REPO/reports/step3_data_integrity.json"
 echo "$RAW" | grep -q "$TAG"
 echo "backend_sheet_write_ok tag=$TAG"

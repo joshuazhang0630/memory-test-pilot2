@@ -1246,6 +1246,10 @@ function collectTrialEvent(index){
         post_q8: "",
         client_meta_json: JSON.stringify({
             response_window: trialResponseWindows[index] || "none",
+            run_mode: currentRunMode(),
+            schema_version: eventSchemaVersion,
+            stimulus_catalog_version: stimulusCatalogVersion,
+            client_build_id: clientBuildId,
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
             assignment_hash: sequenceContext.assignmentHash || "",

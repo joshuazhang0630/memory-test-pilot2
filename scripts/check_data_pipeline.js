@@ -177,6 +177,10 @@ async function main() {
   assert.strictEqual(trialMeta.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(trialMeta.assignment_hash, 'e5f60718');
   assert.strictEqual(trialMeta.level_sequence_hash, '11111111');
+  assert.strictEqual(trialMeta.run_mode, 'qa');
+  assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v2');
+  assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
+  assert.strictEqual(trialMeta.client_build_id, 'pilot2-normalized-data-v1');
 
   ctx.fullsequence = ['A.png', ctx.fixation_address, 'B.png', ctx.fixation_address, 'A.png', ctx.fixation_address];
   ctx.typesequence = [1, 0, 3, 0, 2, 0];
@@ -245,6 +249,8 @@ async function main() {
   assert(requests.every(request => request.payload.rows.length <= 25));
   assert(requests.every(request => request.options.mode === 'cors'));
   assert(requests.every(request => request.options.headers['Content-Type'] === 'text/plain;charset=utf-8'));
+  assert(requests.every(request => request.payload.worksheet_name === 'raw_events'));
+  assert(requests.every(request => request.payload.schema_version === 'pilot2-event-v2'));
   assert.strictEqual(requests.reduce((sum, request) => sum + request.payload.rows.length, 0), 241);
   assert.strictEqual(requests[0].payload.rows[0].pre_q2, 'other|self:pipeline-self-description');
   const sentRows = requests.flatMap(request => request.payload.rows);
@@ -254,6 +260,10 @@ async function main() {
   assert.strictEqual(summaryMeta.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(summaryMeta.assignment_hash, 'e5f60718');
   assert.deepStrictEqual(summaryMeta.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
+  assert.strictEqual(summaryMeta.run_mode, 'qa');
+  assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v2');
+  assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
+  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-normalized-data-v1');
 
   localData.clear();
   let failedRequests = 0;
@@ -270,6 +280,10 @@ async function main() {
   assert.strictEqual(checkpoint.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(checkpoint.assignment_hash, 'e5f60718');
   assert.deepStrictEqual(checkpoint.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
+  assert.strictEqual(checkpoint.run_mode, 'qa');
+  assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v2');
+  assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
+  assert.strictEqual(checkpoint.client_build_id, 'pilot2-normalized-data-v1');
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');

@@ -188,7 +188,14 @@ var vigilanceHistory = [];
 var submissionInProgress = false;
 var sheetAppsUrl = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec";
 var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
-var sheetWorksheetName = "sheet1";
+var sheetWorksheetName = "raw_events";
+var eventSchemaVersion = "pilot2-event-v2";
+var stimulusCatalogVersion = "pilot2_balanced_targets_v2";
+var clientBuildId = "pilot2-normalized-data-v1";
+
+function currentRunMode(){
+    return /^QA_/.test(String(pid || "")) ? "qa" : "production";
+}
 
 // Dev/test helpers (set in console)
 var devFastMode = false;
