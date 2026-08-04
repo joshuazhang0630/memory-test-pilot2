@@ -5,9 +5,13 @@ const vm = require('vm');
 
 const base = path.resolve(__dirname, '..');
 const elements = new Map();
+const windowListeners = new Map();
+let monotonicClock = 10000;
+let imageDecodeCount = 0;
 
 function element(id) {
   if (!elements.has(id)) {
+    const classes = new Set(id === 'stimulus' ? ['stimulus-layer', 'stimulus-layer-active'] : ['stimulus-layer']);
     elements.set(id, {
       id,
       value: '',
@@ -15,10 +19,16 @@ function element(id) {
       textContent: '',
       disabled: false,
       style: {},
+      classList: {
+        add(...names) { names.forEach(name => classes.add(name)); },
+        remove(...names) { names.forEach(name => classes.delete(name)); },
+        contains(name) { return classes.has(name); },
+      },
       setAttribute() {},
       addEventListener() {},
       querySelector() { return null; },
       reportValidity() { return true; },
+      async decode() { imageDecodeCount++; },
     });
   }
   return elements.get(id);
@@ -36,7 +46,29 @@ const ctx = {
   JSON,
   Promise,
   Blob,
+  performance: { now() { return monotonicClock; } },
+  requestAnimationFrame(callback) {
+    monotonicClock += 16;
+    queueMicrotask(() => callback(monotonicClock));
+  },
+  Image: class ImageStub {
+    constructor() {
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.onload = null;
+      this.onerror = null;
+    }
+    set src(value) {
+      this._src = value;
+      this.complete = true;
+      this.naturalWidth = 640;
+      queueMicrotask(() => { if (this.onload) this.onload(); });
+    }
+    get src() { return this._src; }
+    async decode() { imageDecodeCount++; }
+  },
   alert() {},
+  addEventListener(name, handler) { windowListeners.set(name, handler); },
   navigator: {},
   localStorage: {
     setItem(key, value) { localData.set(key, value); },
@@ -52,7 +84,7 @@ const ctx = {
     querySelector() { return null; },
     querySelectorAll() { return []; },
     getElementById: element,
-    body: { innerHTML: '' },
+    body: { innerHTML: '', appendChild() {} },
   },
 };
 ctx.window = ctx;
@@ -86,6 +118,9 @@ function resetSession() {
   ctx.trialOnsetTimestamps = [];
   ctx.trialResponseTimes = [];
   ctx.trialResponseWindows = [];
+  ctx.blockAssetsReady = true;
+  ctx.trialPresentationPending = false;
+  ctx.activeStimulusElementId = 'stimulus';
   ctx.imgstring = '';
   ctx.imtypestring = '';
   ctx.perfstring = '';
@@ -120,7 +155,7 @@ function setTinyLevel(level, imageName) {
   ctx.fullsequence = [`https://example.test/${imageName}`, ctx.fixation_address];
   ctx.typesequence = [1, 0];
   ctx.perfsequence = [14, 0];
-  ctx.trialOnsetTimestamps = [Date.now() - 1000, Date.now()];
+  ctx.trialOnsetTimestamps = [ctx.performance.now() - 1000, ctx.performance.now()];
   ctx.trialResponseTimes = [];
   ctx.trialResponseWindows = [];
 }
@@ -136,6 +171,54 @@ async function main() {
   assert.deepStrictEqual(Array.from(ctx.pretrainTypeSequence), [1, 1, 2, 2]);
   assert.strictEqual(ctx.pretrainSequence[0], ctx.pretrainSequence[2]);
   assert.strictEqual(ctx.pretrainSequence[1], ctx.pretrainSequence[3]);
+  assert.strictEqual(ctx.stimtime, 1000);
+  assert.strictEqual(ctx.isi, 1400);
+  assert.strictEqual(ctx.pretrainMaxAttempts, 3);
+
+  const passBoundary = ctx.evaluatePretrainPerformance([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2], 1, 5);
+  const missFailure = ctx.evaluatePretrainPerformance([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2], 2, 0);
+  const falseAlarmFailure = ctx.evaluatePretrainPerformance([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2], 0, 6);
+  assert.strictEqual(passBoundary.passed, true, '1/3 misses and 5/17 false alarms must pass');
+  assert.strictEqual(missFailure.passed, false, '2/3 misses must fail');
+  assert.strictEqual(falseAlarmFailure.passed, false, '6/17 false alarms must fail');
+
+  const preloadProgress = [];
+  imageDecodeCount = 0;
+  const preloaded = await ctx.preloadImagesForBlock(
+    ['practice-a.png', 'practice-a.png', 'practice-b.png'],
+    (completed, total) => preloadProgress.push([completed, total])
+  );
+  assert.strictEqual(preloaded.size, 2, 'preloader must decode unique URLs only');
+  assert.deepStrictEqual(preloadProgress, [[0, 2], [1, 2], [2, 2]]);
+  assert.strictEqual(imageDecodeCount, 2, 'every unique preloaded image must decode');
+
+  const workingImageStub = ctx.Image;
+  ctx.Image = class StalledImage {};
+  ctx.imagePreloadTimeoutMs = 5;
+  await assert.rejects(ctx.loadAndDecodeImage('stalled.png'), /timed out after 5 ms/);
+  ctx.Image = workingImageStub;
+  ctx.imagePreloadTimeoutMs = 15000;
+
+  ctx.blockAssetsReady = true;
+  const beforePresentation = ctx.performance.now();
+  const paintedPresentation = await ctx.presentStimulusAfterPaint('practice-a.png');
+  assert(paintedPresentation.onset >= beforePresentation + 16, 'onset must be committed on an animation frame');
+  assert.strictEqual(paintedPresentation.activated, true);
+  assert.strictEqual(ctx.activeStimulusElementId, 'stimulus-buffer');
+  assert.strictEqual(element('stimulus-buffer').src, 'practice-a.png');
+  assert.strictEqual(element('stimulus-buffer').classList.contains('stimulus-layer-active'), true);
+  assert.strictEqual(element('stimulus').classList.contains('stimulus-layer-active'), false);
+
+  const imageOnset = paintedPresentation.onset;
+  const imageDeadline = await new Promise(resolve => ctx.scheduleAfterVisibleDuration(imageOnset, ctx.stimtime, () => resolve(ctx.performance.now())));
+  assert(imageDeadline - imageOnset >= 1000, 'image display must never be shorter than 1000 ms');
+  assert(imageDeadline - imageOnset < 1033, 'image display must advance within two 60 Hz frames');
+  const fixationDeadline = await new Promise(resolve => ctx.scheduleAfterVisibleDuration(imageDeadline, ctx.isi, () => resolve(ctx.performance.now())));
+  assert(fixationDeadline - imageDeadline >= 1400, 'fixation interval must never be shorter than 1400 ms');
+  assert(fixationDeadline - imageDeadline < 1433, 'fixation must advance within two 60 Hz frames');
+
+  assert.strictEqual(ctx.resolveManifestUrl('https://example.test/filler/', 'image.png', 'rev-1'), 'https://example.test/filler/image.png?v=rev-1');
+  assert.strictEqual(ctx.resolveManifestUrl('https://example.test/filler/', 'image.png', ''), 'https://example.test/filler/image.png');
   ctx.devFastMode = false;
 
   setTinyLevel(1, 'level1.png');
@@ -160,7 +243,7 @@ async function main() {
   resetSession();
   setTinyLevel(1, 'late-response.png');
   ctx.imCount = 1;
-  ctx.trialOnsetTimestamps[0] = Date.now() - 2100;
+  ctx.trialOnsetTimestamps[0] = ctx.performance.now() - 2100;
   ctx.processResponse({ code: 'Space', preventDefault() {} });
   assert.strictEqual(ctx.perfsequence[0], 13, 'fixation response must update preceding image');
   assert.strictEqual(ctx.perfsequence[1], 0, 'fixation slot must remain untouched');
@@ -180,7 +263,37 @@ async function main() {
   assert.strictEqual(trialMeta.run_mode, 'qa');
   assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v2');
   assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(trialMeta.client_build_id, 'pilot2-normalized-data-v1');
+  assert.strictEqual(trialMeta.client_build_id, 'pilot2-timing-response-dataset-v3');
+  assert.strictEqual(trialMeta.stimulus_timing, 'preloaded-double-buffer-raf-deadline-v2');
+
+  resetSession();
+  setTinyLevel(1, 'transition-response.png');
+  ctx.imCount = 0;
+  ctx.trialPresentationPending = true;
+  ctx.processResponse({ code: 'Space', preventDefault() {} });
+  assert.strictEqual(ctx.perfsequence[0], 13, 'a staging response must map to the currently visible trial');
+  assert.strictEqual(ctx.trialResponseTimes.filter(value => value !== undefined).length, 1);
+  ctx.processResponse({ code: 'Space', preventDefault() {} });
+  assert.strictEqual(ctx.trialResponseTimes.filter(value => value !== undefined).length, 1, 'a trial must accept only one response');
+
+  resetSession();
+  setTinyLevel(1, 'held-response.png');
+  ctx.imCount = 0;
+  ctx.processResponse({ code: 'Space', repeat: true, preventDefault() {} });
+  assert.strictEqual(ctx.trialResponseTimes.length, 0, 'held space must be ignored');
+
+  ctx.showPretrainFeedback = () => {};
+  ctx.blockAssetsReady = true;
+  ctx.pretrainImCount = 0;
+  ctx.pretrainTypeSequence = [1];
+  ctx.pretrainPerfSequence = [14];
+  ctx.pretrainResponseRegistered = [];
+  ctx.pretrainFalseAlarms = 0;
+  ctx.trialPresentationPending = true;
+  ctx.processPretrainResponse({ repeat: false });
+  ctx.processPretrainResponse({ repeat: false });
+  ctx.processPretrainResponse({ repeat: true });
+  assert.strictEqual(ctx.pretrainFalseAlarms, 1, 'practice must count at most one response per image');
 
   ctx.fullsequence = ['A.png', ctx.fixation_address, 'B.png', ctx.fixation_address, 'A.png', ctx.fixation_address];
   ctx.typesequence = [1, 0, 3, 0, 2, 0];
@@ -263,7 +376,7 @@ async function main() {
   assert.strictEqual(summaryMeta.run_mode, 'qa');
   assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v2');
   assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-normalized-data-v1');
+  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-timing-response-dataset-v3');
 
   localData.clear();
   let failedRequests = 0;
@@ -283,7 +396,7 @@ async function main() {
   assert.strictEqual(checkpoint.run_mode, 'qa');
   assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v2');
   assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(checkpoint.client_build_id, 'pilot2-normalized-data-v1');
+  assert.strictEqual(checkpoint.client_build_id, 'pilot2-timing-response-dataset-v3');
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');
@@ -293,8 +406,18 @@ async function main() {
     checks: {
       levelBoundaryTokens: 4,
       devPracticeHasTwoRepeats: true,
+      borkinPracticeBoundaries: true,
+      uniqueImagesPreloadedAndDecoded: true,
+      preloadTimeoutAt15Seconds: true,
+      doubleBufferedFrameActivation: true,
+      imageDurationAtLeast1000ms: true,
+      fixationDurationAtLeast1400ms: true,
+      manifestRevisionCacheBust: true,
       uniqueCrossLevelEventIds: true,
       fixationResponseMappedToImage: true,
+      transitionResponseNotDropped: true,
+      heldSpaceIgnored: true,
+      onePracticeResponsePerImage: true,
       repeatLagCalculated: true,
       sequenceMetadataInTrials: true,
       sequenceMetadataInSummary: true,

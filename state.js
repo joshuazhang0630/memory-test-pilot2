@@ -106,8 +106,8 @@ var experimentCompleted = false;
 var postSurveyVisible = false;
 var endingStatus = "";
 var stopAfterLevel = "";
-var stimtime = 2000; // in milliseconds
-var isi = 1200; // in milliseconds
+var stimtime = 1000; // image display duration in milliseconds
+var isi = 1400; // fixation interval in milliseconds
 var levelTrialCount = 120; // fixed presentations per level
 var targetRepeatDelayMin = 91;
 var targetRepeatDelayMax = 109;
@@ -133,17 +133,18 @@ var pretrainSequence = []; // Full pretrain sequence with repeats
 var pretrainTypeSequence = []; // Type of each pretrain trial
 var pretrainPerfSequence = []; // Performance for pretrain
 
-// Practice pass criteria (tweak as needed)
-var pretrainRequiredHits = 2;
-var pretrainMaxFalseAlarms = 1;
+// Borkin practice pass criteria: miss rate < 50%, false-alarm rate < 30%.
+var pretrainMissRateThreshold = 0.5;
+var pretrainFalseAlarmRateThreshold = 0.3;
 var pretrainFailCount = 0;
-var pretrainMaxAttempts = 2;
+var pretrainMaxAttempts = 3;
 var inPretrainMode = false;
 var pretrainImCount = -1;
 var pretrainHits = 0;
 var pretrainMisses = 0;
 var pretrainFalseAlarms = 0;
 var pretrainCorrectRejections = 0;
+var pretrainResponseRegistered = [];
 
 // global variables that are calculated later based on parameters
 var numfoils = 0;
@@ -183,6 +184,11 @@ var lastCheckpointTrialCount = 0;
 var trialOnsetTimestamps = [];
 var trialResponseTimes = [];
 var trialResponseWindows = [];
+var preloadedImageAssets = new Map();
+var blockAssetsReady = false;
+var trialPresentationPending = false;
+var imagePreloadTimeoutMs = 15000;
+var activeStimulusElementId = "stimulus";
 var savedProgressKeys = {};
 var vigilanceHistory = [];
 var submissionInProgress = false;
@@ -191,7 +197,7 @@ var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
 var sheetWorksheetName = "raw_events";
 var eventSchemaVersion = "pilot2-event-v2";
 var stimulusCatalogVersion = "pilot2_balanced_targets_v2";
-var clientBuildId = "pilot2-normalized-data-v1";
+var clientBuildId = "pilot2-timing-response-dataset-v3";
 
 function currentRunMode(){
     return /^QA_/.test(String(pid || "")) ? "qa" : "production";

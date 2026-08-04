@@ -14,6 +14,7 @@ async function fetchManifest(url){
     return {
         sourceUrl: url,
         baseUrl: normalizeBaseUrl(manifest.baseUrl || ""),
+        revision: String(manifest.revision || ""),
         files: Array.isArray(manifest.files) ? manifest.files : []
     };
 }
@@ -25,11 +26,15 @@ async function loadManifests(){
     return { targetManifest: targetManifest, fillerManifest: fillerManifest, pretrainManifest: pretrainManifest };
 }
 
-function resolveManifestUrl(base, name){
+function resolveManifestUrl(base, name, revision){
     if (!name){
         return "";
     }
-    return name.startsWith("http") ? name : (normalizeBaseUrl(base) + name);
+    var resolved = name.startsWith("http") ? name : (normalizeBaseUrl(base) + name);
+    if (!revision){
+        return resolved;
+    }
+    return resolved + (resolved.indexOf("?") === -1 ? "?" : "&") + "v=" + encodeURIComponent(revision);
 }
 
 function basenameWithoutExt(path){
@@ -49,8 +54,8 @@ function buildGlobalRegistry(targetManifest, fillerManifest, pretrainManifest){
         byId: {}
     };
 
-    function pushRecord(kind, fileName, baseUrl){
-        var url = resolveManifestUrl(baseUrl, fileName);
+    function pushRecord(kind, fileName, baseUrl, revision){
+        var url = resolveManifestUrl(baseUrl, fileName, revision);
         var imageId = basenameWithoutExt(fileName);
         if (!imageId){
             return;
@@ -74,8 +79,8 @@ function buildGlobalRegistry(targetManifest, fillerManifest, pretrainManifest){
         }
     }
 
-    targetManifest.files.forEach(function(name){ pushRecord("target", name, targetManifest.baseUrl); });
-    fillerManifest.files.forEach(function(name){ pushRecord("filler", name, fillerManifest.baseUrl); });
+    targetManifest.files.forEach(function(name){ pushRecord("target", name, targetManifest.baseUrl, targetManifest.revision); });
+    fillerManifest.files.forEach(function(name){ pushRecord("filler", name, fillerManifest.baseUrl, fillerManifest.revision); });
 
     var formalUrls = {};
     var formalNames = {};
@@ -86,7 +91,7 @@ function buildGlobalRegistry(targetManifest, fillerManifest, pretrainManifest){
 
     (pretrainManifest.files || []).forEach(function(name){
         var fileName = (name || "").split("/").pop();
-        var url = resolveManifestUrl(pretrainManifest.baseUrl, name);
+        var url = resolveManifestUrl(pretrainManifest.baseUrl, name, pretrainManifest.revision);
         if (!fileName || formalUrls[url] || formalNames[fileName]){
             return;
         }

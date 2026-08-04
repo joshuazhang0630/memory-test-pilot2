@@ -103,19 +103,29 @@
             max-width: min(512px, calc(100vw - 88px));
             max-height: min(512px, calc(100vw - 88px));
             aspect-ratio: 1 / 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative;
+            overflow: hidden;
             background-color: var(--white);
             margin: 16px auto 0;
         }
 
-        #stimulus {
+        .stimulus-layer {
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
             object-fit: contain;
             display: block;
             background-color: var(--white);
+            visibility: hidden;
+            opacity: 0;
+            z-index: 1;
+        }
+
+        .stimulus-layer-active {
+            visibility: visible;
+            opacity: 1;
+            z-index: 2;
         }
 
         .instruction-callout {
@@ -168,6 +178,30 @@
             color: var(--dark-gray);
             margin-bottom: 24px;
             font-weight: 600;
+        }
+
+        .preload-status {
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 20px;
+            background-color: var(--light-gray);
+        }
+
+        .preload-status .instruction-callout {
+            margin-top: 0;
+        }
+
+        .preload-status .progress-label {
+            margin-bottom: 0;
+        }
+
+        .preload-status .preload-error {
+            color: var(--error);
+        }
+
+        .preload-actions:empty {
+            display: none;
         }
 
         .device-warning {

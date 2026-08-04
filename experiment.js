@@ -1,3 +1,245 @@
+function uniqueImageUrls(urls) {
+    var seen = {};
+    return (urls || []).filter(function(url){
+        if (!url || seen[url]){
+            return false;
+        }
+        seen[url] = true;
+        return true;
+    });
+}
+
+function monotonicNow(){
+    return performance.now();
+}
+
+function nextAnimationFrame(){
+    return new Promise(function(resolve){
+        requestAnimationFrame(function(timestamp){
+            resolve(timestamp);
+        });
+    });
+}
+
+function scheduleAfterVisibleDuration(onset, duration, callback){
+    var deadline = onset + duration;
+    function waitForDeadline(timestamp){
+        if (timestamp >= deadline){
+            callback();
+            return;
+        }
+        requestAnimationFrame(waitForDeadline);
+    }
+    requestAnimationFrame(waitForDeadline);
+}
+
+function stimulusLayersMarkup(altText){
+    return `
+        <img id="stimulus" class="stimulus-layer stimulus-layer-active" src="${fixation_address}" alt="${altText}">
+        <img id="stimulus-buffer" class="stimulus-layer" src="${fixation_address}" alt="" aria-hidden="true">
+    `;
+}
+
+function stimulusLayers(){
+    var first = document.getElementById("stimulus");
+    var second = document.getElementById("stimulus-buffer");
+    if (!first || !second){
+        throw new Error("Stimulus layers are missing");
+    }
+    return activeStimulusElementId === "stimulus-buffer" ? [second, first] : [first, second];
+}
+
+function loadAndDecodeImage(url){
+    return new Promise(function(resolve, reject){
+        var image = new Image();
+        var settled = false;
+        var decodingStarted = false;
+        var timeoutId = setTimeout(function(){
+            fail("timed out after " + imagePreloadTimeoutMs + " ms");
+        }, imagePreloadTimeoutMs);
+
+        function fail(reason){
+            if (settled){
+                return;
+            }
+            settled = true;
+            clearTimeout(timeoutId);
+            reject(new Error("Unable to preload image: " + url + (reason ? " (" + reason + ")" : "")));
+        }
+
+        function succeed(){
+            if (settled){
+                return;
+            }
+            settled = true;
+            clearTimeout(timeoutId);
+            resolve(image);
+        }
+
+        function decodeLoadedImage(){
+            if (settled || decodingStarted){
+                return;
+            }
+            decodingStarted = true;
+            if (!image.decode){
+                succeed();
+                return;
+            }
+            image.decode().then(function(){
+                succeed();
+            }).catch(function(err){
+                fail(err && err.message ? err.message : "decode failed");
+            });
+        }
+
+        image.decoding = "async";
+        image.loading = "eager";
+        image.onload = decodeLoadedImage;
+        image.onerror = function(){ fail("download failed"); };
+        image.src = url;
+
+        if (image.complete){
+            if (image.naturalWidth > 0){
+                decodeLoadedImage();
+            } else {
+                fail("empty image");
+            }
+        }
+    });
+}
+
+async function preloadImagesForBlock(urls, onProgress){
+    var uniqueUrls = uniqueImageUrls(urls);
+    var assets = new Map();
+    var completed = 0;
+    var nextIndex = 0;
+    var workerCount = Math.min(6, uniqueUrls.length);
+
+    if (onProgress){
+        onProgress(0, uniqueUrls.length, "");
+    }
+    if (!uniqueUrls.length){
+        preloadedImageAssets = assets;
+        return assets;
+    }
+
+    async function worker(){
+        while (nextIndex < uniqueUrls.length){
+            var index = nextIndex;
+            nextIndex++;
+            var url = uniqueUrls[index];
+            var asset = await loadAndDecodeImage(url);
+            assets.set(url, asset);
+            completed++;
+            if (onProgress){
+                onProgress(completed, uniqueUrls.length, url);
+            }
+        }
+    }
+
+    var workers = [];
+    for (var i = 0; i < workerCount; i++){
+        workers.push(worker());
+    }
+    await Promise.all(workers);
+    preloadedImageAssets = assets;
+    return assets;
+}
+
+function updatePreloadProgress(completed, total){
+    var bar = document.getElementById("preload-progress");
+    var label = document.getElementById("preload-progress-label");
+    var percent = total ? Math.round((completed / total) * 100) : 100;
+    if (bar){
+        bar.style.width = percent + "%";
+        bar.setAttribute("aria-valuenow", String(percent));
+    }
+    if (label){
+        label.textContent = completed + " / " + total + " images ready (" + percent + "%)";
+    }
+}
+
+function showPreloadFailure(err, retry){
+    var status = document.getElementById("preload-status-text");
+    var actions = document.getElementById("preload-actions");
+    if (status){
+        status.textContent = "Some images could not be prepared. Check your connection and retry before continuing.";
+        status.classList.add("preload-error");
+    }
+    if (actions){
+        actions.innerHTML = '<button type="button" id="retry-preload" class="primary-button">Retry Loading</button>';
+        document.getElementById("retry-preload").onclick = retry;
+    }
+    console.error("Image preload failed", err);
+}
+
+async function prepareBlockImages(urls, readyMessage, retry){
+    blockAssetsReady = false;
+    trialPresentationPending = false;
+    preloadedImageAssets = new Map();
+    var status = document.getElementById("preload-status-text");
+    var actions = document.getElementById("preload-actions");
+    if (status){
+        status.textContent = "Downloading and decoding images before the block begins...";
+        status.classList.remove("preload-error");
+    }
+    if (actions){
+        actions.innerHTML = "";
+    }
+    try {
+        await preloadImagesForBlock(uniqueImageUrls((urls || []).concat([fixation_address])), updatePreloadProgress);
+        blockAssetsReady = true;
+        if (status){
+            status.textContent = readyMessage;
+        }
+        return true;
+    } catch (err){
+        showPreloadFailure(err, retry);
+        return false;
+    }
+}
+
+async function presentStimulusAfterPaint(url, beforeActivate, afterActivate){
+    if (!blockAssetsReady || !preloadedImageAssets.has(url)){
+        throw new Error("Stimulus was not preloaded: " + url);
+    }
+    var layers = stimulusLayers();
+    var current = layers[0];
+    var next = layers[1];
+    next.src = url;
+    if (next.decode){
+        await next.decode();
+    }
+    return new Promise(function(resolve){
+        requestAnimationFrame(function(timestamp){
+            if (beforeActivate && beforeActivate(timestamp) === false){
+                resolve({ activated: false, onset: timestamp });
+                return;
+            }
+            next.classList.add("stimulus-layer-active");
+            current.classList.remove("stimulus-layer-active");
+            activeStimulusElementId = next.id;
+            if (afterActivate){
+                afterActivate(timestamp);
+            }
+            resolve({ activated: true, onset: timestamp });
+        });
+    });
+}
+
+function preloadStatusMarkup(){
+    return `
+        <div class="preload-status" aria-live="polite">
+            <p id="preload-status-text" class="instruction-callout">Preparing images...</p>
+            <div class="progress-track" role="progressbar" aria-label="Image loading progress" aria-valuemin="0" aria-valuemax="100">
+                <div id="preload-progress" class="progress-bar" aria-valuenow="0"></div>
+            </div>
+            <div id="preload-progress-label" class="progress-label">0 / 0 images ready (0%)</div>
+            <div id="preload-actions" class="action-row preload-actions"></div>
+        </div>
+    `;
+}
+
 function selectPretrainImages() {
     var pool = pretestImages.slice();
     shuffleArray(pool);
@@ -72,7 +314,7 @@ function showInstructions() {
                 Workflow overview: in Phase 1, mark as many repeated images as you can. In Phase 2, you will evaluate the images you saw in the sequence(s).
             </p>
             <ol class="instruction-list">
-                <li><strong>Attend carefully.</strong> Each visualization appears for ${stimtime / 1000} seconds followed by a fixation interval.</li>
+                <li><strong>Attend carefully.</strong> Each visualization appears for ${(stimtime / 1000).toFixed(1)} seconds, followed by a ${(isi / 1000).toFixed(1)} second fixation interval.</li>
                 <li><strong>Respond only to repeats.</strong> Press the <strong>SPACE BAR</strong> as soon as you recognize a repeated image in the active block.</li>
                 <li><strong>Remain focused.</strong> Repeats may occur long after first exposure and can closely resemble other images.</li>
             </ol>
@@ -104,15 +346,19 @@ function runFastFlow() {
 }
 
 // Start pretrain
-function startPretrain() {
+async function startPretrain() {
 	inPretrainMode = true;
 	pretrainImCount = -1;
+	blockAssetsReady = false;
+	trialPresentationPending = false;
+	activeStimulusElementId = "stimulus";
 	
     // Reset counters
 	pretrainHits = 0;
 	pretrainMisses = 0;
 	pretrainFalseAlarms = 0;
 	pretrainCorrectRejections = 0;
+	pretrainResponseRegistered = [];
 	
 	var practiceView = `
 		<section class="card">
@@ -120,40 +366,64 @@ function startPretrain() {
 			<p class="lead-text">
 				During practice, respond only when a visualization repeats within this practice block. Use the <strong>SPACE BAR</strong> to register detections.
 			</p>
+			${preloadStatusMarkup()}
 			<div class="stimulus-panel">
 				<div id="performancerecord" class="instruction-callout">
-					Please look at the cross when it appears on the screen. Press SPACE to begin the practice sequence.
+					Please wait while the practice images are prepared.
 				</div>
 				<div class="stimulus-frame">
-					<img id="stimulus" src="${fixation_address}" alt="Practice stimulus">
+					${stimulusLayersMarkup("Practice stimulus")}
 				</div>
 			</div>
 			<p class="muted-text">Keyboard input required: SPACE BAR only.</p>
 		</section>
 	`;
 	document.body.innerHTML = renderShell(practiceView);
+
+	var ready = await prepareBlockImages(
+		pretrainSequence,
+		"Practice images are ready.",
+		function(){ void startPretrain(); }
+	);
+	if (ready){
+		document.getElementById("performancerecord").innerHTML = "Please look at the cross when it appears on the screen. Press SPACE to begin the practice sequence.";
+	}
 }
 
 // Animate pretrain sequence
-function animatePretrainSequence() {
-    pretrainImCount++;
-    
-    if (pretrainImCount >= pretrainSequence.length * 2) { // *2 because we have fixations
+async function animatePretrainSequence() {
+    if (trialPresentationPending || !blockAssetsReady){
+        return;
+    }
+    trialPresentationPending = true;
+    var nextIndex = pretrainImCount + 1;
+    if (nextIndex >= pretrainSequence.length * 2) { // *2 because we have fixations
         // Pretrain finished
+        trialPresentationPending = false;
         showPretrainResults();
         return;
     }
-    
+
     // Determine if it's an image or fixation
-    var isImage = (pretrainImCount % 2 === 0);
+    var isImage = (nextIndex % 2 === 0);
     
+    var nextUrl = fixation_address;
+    var duration = isi;
     if (isImage) {
-        var imgIndex = Math.floor(pretrainImCount / 2);
-        document.getElementById("stimulus").src = pretrainSequence[imgIndex];
-        setTimeout("animatePretrainSequence()", stimtime);
-    } else {
-        document.getElementById("stimulus").src = fixation_address;
-        setTimeout("animatePretrainSequence()", isi);
+        var imgIndex = Math.floor(nextIndex / 2);
+        nextUrl = pretrainSequence[imgIndex];
+        duration = stimtime;
+    }
+    try {
+        var presentation = await presentStimulusAfterPaint(nextUrl, null, function(){
+            pretrainImCount = nextIndex;
+        });
+        trialPresentationPending = false;
+        scheduleAfterVisibleDuration(presentation.onset, duration, animatePretrainSequence);
+    } catch (err){
+        trialPresentationPending = false;
+        blockAssetsReady = false;
+        showPreloadFailure(err, function(){ void startPretrain(); });
     }
 }
 
@@ -192,18 +462,29 @@ function showPretrainFeedback(type) {
 }
 
 // Process pretrain response
-function processPretrainResponse() {
-    if (pretrainImCount < 0) {
-        // Start the pretrain
-        document.getElementById("performancerecord").innerHTML = "";
-        animatePretrainSequence();
+function processPretrainResponse(event) {
+    if (!blockAssetsReady || (event && event.repeat)){
         return;
     }
-    
+    if (pretrainImCount < 0) {
+        if (trialPresentationPending){
+            return;
+        }
+        // Start the pretrain
+        document.getElementById("performancerecord").innerHTML = "";
+        void animatePretrainSequence();
+        return;
+    }
+
     var isImage = (pretrainImCount % 2 === 0);
+    var imgIndex = isImage ? Math.floor(pretrainImCount / 2) : Math.floor((pretrainImCount - 1) / 2);
+    if (imgIndex < 0 || pretrainResponseRegistered[imgIndex]){
+        return;
+    }
+    pretrainResponseRegistered[imgIndex] = true;
+
     if (!isImage && pretrainImCount > 0) {
         // They pressed during fixation, check previous image
-        var imgIndex = Math.floor((pretrainImCount - 1) / 2);
         var trialType = pretrainTypeSequence[imgIndex];
         
         if (trialType === REPEAT) {
@@ -218,7 +499,6 @@ function processPretrainResponse() {
             showPretrainFeedback('false-alarm');
         }
     } else if (isImage) {
-        var imgIndex = Math.floor(pretrainImCount / 2);
         var trialType = pretrainTypeSequence[imgIndex];
         
         if (trialType === REPEAT) {
@@ -235,6 +515,20 @@ function processPretrainResponse() {
     }
 }
 
+function evaluatePretrainPerformance(types, misses, falseAlarms){
+    var totalRepeats = types.filter(function(t){ return t === REPEAT; }).length || 1;
+    var totalNovel = types.filter(function(t){ return t !== REPEAT; }).length || 1;
+    var missRate = misses / totalRepeats;
+    var falseAlarmRate = falseAlarms / totalNovel;
+    return {
+        totalRepeats: totalRepeats,
+        totalNovel: totalNovel,
+        missRate: missRate,
+        falseAlarmRate: falseAlarmRate,
+        passed: missRate < pretrainMissRateThreshold && falseAlarmRate < pretrainFalseAlarmRateThreshold
+    };
+}
+
 // Show pretrain results
 function showPretrainResults() {
 	// Count misses and correct rejections
@@ -246,9 +540,13 @@ function showPretrainResults() {
         }
     }
     
-    var totalRepeats = pretrainTypeSequence.filter(function(t){ return t === REPEAT; }).length || 1;
+    var evaluation = evaluatePretrainPerformance(pretrainTypeSequence, pretrainMisses, pretrainFalseAlarms);
+    var totalRepeats = evaluation.totalRepeats;
+    var totalNovel = evaluation.totalNovel;
     var accuracy = Math.round((pretrainHits / totalRepeats) * 100);
-    var passedPractice = (pretrainHits >= pretrainRequiredHits) && (pretrainFalseAlarms <= pretrainMaxFalseAlarms);
+    var missRate = evaluation.missRate;
+    var falseAlarmRate = evaluation.falseAlarmRate;
+    var passedPractice = evaluation.passed;
     if (passedPractice){
         pretrainFailCount = 0;
     } else {
@@ -285,23 +583,31 @@ function showPretrainResults() {
 					<div class="stat-label">Accuracy</div>
 					<div class="stat-value">${accuracy}%</div>
 				</div>
-				<div class="stat-item">
-					<div class="stat-label">False Alarms</div>
-					<div class="stat-value">${pretrainFalseAlarms}</div>
-				</div>
+					<div class="stat-item">
+						<div class="stat-label">False Alarms</div>
+						<div class="stat-value">${pretrainFalseAlarms} / ${totalNovel}</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">Miss Rate</div>
+						<div class="stat-value">${Math.round(missRate * 100)}%</div>
+					</div>
+					<div class="stat-item">
+						<div class="stat-label">False-alarm Rate</div>
+						<div class="stat-value">${Math.round(falseAlarmRate * 100)}%</div>
+					</div>
 			</div>
 			<p class="lead-text">
 				Respond only when the visualization is identical to one seen earlier within the <strong>current sequence</strong>, and continue using the <strong>SPACE BAR</strong> for every response.
 				After you continue, all practice images are removed and do not influence the primary experiment.
 			</p>
-            ${passedPractice ? `
+			${passedPractice ? `
 			<div class="action-row">
 				<button class="primary-button" onclick="startRealExperiment()">Continue to Experiment</button>
 			</div>
             ` : `
-            <p class="lead-text" style="color: var(--error);">
-                Practice needs more accuracy before advancing. Please detect at least ${pretrainRequiredHits} repeat${pretrainRequiredHits === 1 ? "" : "s"} and make no more than ${pretrainMaxFalseAlarms} false alarm${pretrainMaxFalseAlarms === 1 ? "" : "s"}.
-            </p>
+			<p class="lead-text" style="color: var(--error);">
+				Practice requires a miss rate below ${Math.round(pretrainMissRateThreshold * 100)}% and a false-alarm rate below ${Math.round(pretrainFalseAlarmRateThreshold * 100)}%. This attempt recorded ${Math.round(missRate * 100)}% misses and ${Math.round(falseAlarmRate * 100)}% false alarms.
+			</p>
             <div class="action-row">
                 <button class="primary-button" onclick="buildPretrainSequence(); startPretrain();">Repeat Practice Block</button>
             </div>
@@ -335,10 +641,11 @@ function renderExperimentInterface(levelKey){
 				Press the <strong>SPACE BAR</strong> whenever you detect an exact repeat of a visualization in this <strong>current sequence</strong>.
 				Images do not repeat between sequences. Images from the practice block have been removed and will not appear here. Avoid responses during fixation intervals.
 			</p>
+			${preloadStatusMarkup()}
 			<div class="stimulus-panel">
-				<div id="performancerecord" class="instruction-callout"></div>
+				<div id="performancerecord" class="instruction-callout">Please wait while this level's images are prepared.</div>
 				<div class="stimulus-frame">
-					<img id="stimulus" src="${fixation_address}" alt="Stimulus image">
+					${stimulusLayersMarkup("Stimulus image")}
 				</div>
 			</div>
 			<p class="muted-text text-center">Post-sequence questions will appear automatically once the session ends.</p>
@@ -354,14 +661,25 @@ function renderExperimentInterface(levelKey){
 		}
 	};
 	
-	// Now preload and start the real experiment
+	// Build the exact level sequence before its unique images are preloaded.
 	preloadEverything();
 	updateExperimentProgress();
 }
 
-function startLevel(levelKey){
+async function startLevel(levelKey){
+	blockAssetsReady = false;
+	trialPresentationPending = false;
+	activeStimulusElementId = "stimulus";
 	setCurrentLevel(levelKey);
 	renderExperimentInterface(levelKey);
+	var ready = await prepareBlockImages(
+		fullsequence,
+		"All images for this level are downloaded and decoded.",
+		function(){ void startLevel(levelKey); }
+	);
+	if (ready){
+		document.getElementById("performancerecord").innerHTML = "Press the <b>SPACE BAR</b> to start. If it doesn't work, make sure to click in this browser window first.";
+	}
 }
 
 // Start real experiment
@@ -399,7 +717,7 @@ function startRealExperiment() {
 		document.body.innerHTML = renderShell("<section class='card'><h1 class='section-title'>No levels available</h1><p class='lead-text'>No runtime levels were generated.</p></section>");
 		return;
 	}
-	startLevel(nextLevel);
+	void startLevel(nextLevel);
 }
 // key press listener
 document.onkeydown = function(key){ 
@@ -416,7 +734,7 @@ document.onkeydown = function(key){
     if (inPretrainMode) {
         if (isSpaceKey(key)) {
             key.preventDefault();
-            processPretrainResponse();
+            processPretrainResponse(key);
         }
     } else {
         if (isResponseKey(key)){
@@ -442,31 +760,63 @@ async function buttonPress(){
 			setCurrentLevel(nextLevel);
 		}
 	}
-	preloadEverything();
-	document.getElementById("performancerecord").innerHTML = "Press the <b>SPACE BAR</b> to start. If it doesn't work, make sure to click in this browser window first.";
+	await startLevel(currentLevelKey);
 }
 
-// recursive function that shows the images in a sequence
-function animateSequence(){
-	if (imCount > 0 && typesequence[imCount] === FIXATION){
-		finalizeTrialPair(imCount - 1, imCount);
-	}
-
-	if (kickedOut){
-		showFailure();
+// Recursive function that presents each decoded image and starts timing only after paint.
+async function animateSequence(){
+	if (trialPresentationPending || !blockAssetsReady){
 		return;
 	}
-	
-	imCount++;
-	updateExperimentProgress();
-	if (imCount == fullsequence.length){
-		showEnding();
+	trialPresentationPending = true;
+	var previousIndex = imCount;
+	var nextIndex = previousIndex + 1;
+	if (nextIndex === fullsequence.length){
+		if (previousIndex > 0 && typesequence[previousIndex] === FIXATION){
+			finalizeTrialPair(previousIndex - 1, previousIndex);
+		}
+		trialPresentationPending = false;
+		if (kickedOut){
+			showFailure();
+		} else {
+			showEnding();
+		}
 		return;
 	}
-	document.getElementById("stimulus").src = fullsequence[imCount];
-	trialOnsetTimestamps[imCount] = Date.now();
-	
-	setTimeout("animateSequence()", timesequence[imCount]);
+	try {
+		var presentation = await presentStimulusAfterPaint(
+			fullsequence[nextIndex],
+			function(){
+				if (previousIndex > 0 && typesequence[previousIndex] === FIXATION){
+					finalizeTrialPair(previousIndex - 1, previousIndex);
+				}
+				if (kickedOut){
+					trialPresentationPending = false;
+					showFailure();
+					return false;
+				}
+				return true;
+			},
+			function(timestamp){
+				imCount = nextIndex;
+				trialOnsetTimestamps[nextIndex] = timestamp;
+				updateExperimentProgress();
+				if (nextIndex === 0 && !experimentStartTimestamp){
+					startExperimentTimer();
+				}
+			}
+		);
+		if (!presentation.activated){
+			return;
+		}
+		trialPresentationPending = false;
+		scheduleAfterVisibleDuration(presentation.onset, timesequence[nextIndex], animateSequence);
+	} catch (err){
+		trialPresentationPending = false;
+		blockAssetsReady = false;
+		stopExperimentTimer();
+		showPreloadFailure(err, function(){ void startLevel(currentLevelKey); });
+	}
 }
 
 // preload and calculate everything
@@ -484,6 +834,7 @@ function resetLevelState(){
 	trialOnsetTimestamps = [];
 	trialResponseTimes = [];
 	trialResponseWindows = [];
+	trialPresentationPending = false;
 }
 
 function addToSessionCatalog(list){
@@ -625,12 +976,15 @@ function isResponseKey(event){
 // get the key and respond
 function processResponse(key){
 	if(isResponseKey(key)){
+		if (!blockAssetsReady || key.repeat){
+			return;
+		}
 		if (imCount<0) {
-			document.getElementById("performancerecord").innerHTML = "";
-			if (!inPretrainMode){
-				startExperimentTimer();
+			if (trialPresentationPending){
+				return;
 			}
-			animateSequence();
+			document.getElementById("performancerecord").innerHTML = "";
+			void animateSequence();
 			return;
 		}
 		var responseIndex = imCount;
@@ -652,7 +1006,9 @@ function processResponse(key){
 		} else {
 			return;
 		}
-		trialResponseTimes[responseIndex] = Math.max(0, Date.now() - (trialOnsetTimestamps[responseIndex] || Date.now()));
+		var responseTimestamp = monotonicNow();
+		var onsetTimestamp = trialOnsetTimestamps[responseIndex];
+		trialResponseTimes[responseIndex] = onsetTimestamp === undefined ? "" : Math.max(0, responseTimestamp - onsetTimestamp);
 		trialResponseWindows[responseIndex] = responseWindow;
 	}
 }
@@ -1250,6 +1606,7 @@ function collectTrialEvent(index){
             schema_version: eventSchemaVersion,
             stimulus_catalog_version: stimulusCatalogVersion,
             client_build_id: clientBuildId,
+            stimulus_timing: "preloaded-double-buffer-raf-deadline-v2",
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
             assignment_hash: sequenceContext.assignmentHash || "",

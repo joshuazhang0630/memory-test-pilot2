@@ -42,7 +42,7 @@ New trial, checkpoint, and session-summary metadata includes:
 - `run_mode`
 - `schema_version = pilot2-event-v2`
 - `stimulus_catalog_version = pilot2_balanced_targets_v2`
-- `client_build_id = pilot2-normalized-data-v1`
+- `client_build_id = pilot2-timing-response-dataset-v3`
 - the existing sequence algorithm, seed, assignment, and per-level sequence hashes
 
 The game writes to `raw_events`. Older cached clients that still request `sheet1` continue to route to the first sheet, which remains `raw_events`.
