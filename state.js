@@ -181,6 +181,9 @@ var trialEventRows = [];
 var currentSessionId = "";
 var checkpointEveryTrials = 20;
 var lastCheckpointTrialCount = 0;
+var lastSyncedTrialCount = 0;
+var checkpointSyncInProgress = false;
+var checkpointSyncQueued = false;
 var trialOnsetTimestamps = [];
 var trialResponseTimes = [];
 var trialResponseWindows = [];
@@ -197,7 +200,7 @@ var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
 var sheetWorksheetName = "raw_events";
 var eventSchemaVersion = "pilot2-event-v2";
 var stimulusCatalogVersion = "pilot2_balanced_targets_v2";
-var clientBuildId = "pilot2-timing-response-dataset-v3";
+var clientBuildId = "pilot2-remote-checkpoint-v4";
 
 function currentRunMode(){
     return /^QA_/.test(String(pid || "")) ? "qa" : "production";

@@ -694,6 +694,9 @@ function startRealExperiment() {
 	perfstring = "";
 	currentSessionId = (pid || "anon") + "-" + Date.now();
 	lastCheckpointTrialCount = 0;
+	lastSyncedTrialCount = 0;
+	checkpointSyncInProgress = false;
+	checkpointSyncQueued = false;
 	falsealarmcounts = 0;
 	vigilancefails = 0;
 	kickedOut = 0;

@@ -114,6 +114,10 @@ function resetSession() {
   ctx.vigilancefails = 0;
   ctx.vigilanceHistory = [];
   ctx.trialEventRows = [];
+  ctx.lastCheckpointTrialCount = 0;
+  ctx.lastSyncedTrialCount = 0;
+  ctx.checkpointSyncInProgress = false;
+  ctx.checkpointSyncQueued = false;
   ctx.savedProgressKeys = {};
   ctx.trialOnsetTimestamps = [];
   ctx.trialResponseTimes = [];
@@ -263,7 +267,7 @@ async function main() {
   assert.strictEqual(trialMeta.run_mode, 'qa');
   assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v2');
   assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(trialMeta.client_build_id, 'pilot2-timing-response-dataset-v3');
+  assert.strictEqual(trialMeta.client_build_id, 'pilot2-remote-checkpoint-v4');
   assert.strictEqual(trialMeta.stimulus_timing, 'preloaded-double-buffer-raf-deadline-v2');
 
   resetSession();
@@ -341,6 +345,51 @@ async function main() {
   ctx.imgstring = Array.from({ length: 480 }, (_, i) => i % 2 ? 'fixation.jpg' : `image-${i / 2}.png`).join(',');
   ctx.imtypestring = Array.from({ length: 480 }, (_, i) => i % 2 ? '0' : '3').join(',');
   ctx.perfstring = Array.from({ length: 480 }, (_, i) => i % 2 ? '0' : '14').join(',');
+  const fullTrialRows = ctx.trialEventRows.slice();
+  const fullImgstring = ctx.imgstring;
+  const fullImtypestring = ctx.imtypestring;
+  const fullPerfstring = ctx.perfstring;
+
+  const checkpointRequests = [];
+  ctx.fetch = async (url, options) => {
+    checkpointRequests.push({ url, options, payload: JSON.parse(options.body) });
+    const rowCount = checkpointRequests.at(-1).payload.rows.length;
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { ok: true, received: rowCount, appended: rowCount, duplicates: 0, sheet: 'test:sheet1' };
+      },
+    };
+  };
+  ctx.trialEventRows = ctx.trialEventRows.slice(0, 30);
+  const checkpointResult = await ctx.syncPendingTrialRows();
+  assert.strictEqual(checkpointResult.ok, true);
+  assert.strictEqual(checkpointResult.rows, 30);
+  assert.strictEqual(checkpointResult.chunks, 2);
+  assert.strictEqual(ctx.lastSyncedTrialCount, 30);
+  assert.strictEqual(checkpointRequests.length, 2);
+  assert(checkpointRequests.every(request => request.payload.checkpoint === true));
+  assert.deepStrictEqual(checkpointRequests.map(request => request.payload.rows.length), [25, 5]);
+
+  const beaconPayloads = [];
+  ctx.navigator.sendBeacon = (url, blob) => {
+    beaconPayloads.push({ url, blob });
+    return true;
+  };
+  ctx.lastSyncedTrialCount = 20;
+  assert.strictEqual(windowListeners.get('pagehide'), ctx.flushPendingTrialRowsWithBeacon);
+  assert.strictEqual(ctx.flushPendingTrialRowsWithBeacon(), true);
+  assert.strictEqual(beaconPayloads.length, 1);
+  const beaconPayload = JSON.parse(await beaconPayloads[0].blob.text());
+  assert.strictEqual(beaconPayload.checkpoint, true);
+  assert.strictEqual(beaconPayload.rows.length, 10);
+
+  resetSession();
+  ctx.trialEventRows = fullTrialRows;
+  ctx.imgstring = fullImgstring;
+  ctx.imtypestring = fullImtypestring;
+  ctx.perfstring = fullPerfstring;
 
   const requests = [];
   ctx.fetch = async (url, options) => {
@@ -376,7 +425,7 @@ async function main() {
   assert.strictEqual(summaryMeta.run_mode, 'qa');
   assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v2');
   assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-timing-response-dataset-v3');
+  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-remote-checkpoint-v4');
 
   localData.clear();
   let failedRequests = 0;
@@ -396,7 +445,7 @@ async function main() {
   assert.strictEqual(checkpoint.run_mode, 'qa');
   assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v2');
   assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(checkpoint.client_build_id, 'pilot2-timing-response-dataset-v3');
+  assert.strictEqual(checkpoint.client_build_id, 'pilot2-remote-checkpoint-v4');
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');
@@ -422,6 +471,8 @@ async function main() {
       sequenceMetadataInTrials: true,
       sequenceMetadataInSummary: true,
       sequenceMetadataInCheckpoint: true,
+      remoteCheckpointUpload: true,
+      pageExitBeacon: true,
       productionRows: success.rows,
       productionChunks: success.chunks,
       verifiedJsonAcknowledgement: true,

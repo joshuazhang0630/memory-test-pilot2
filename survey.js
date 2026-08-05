@@ -171,7 +171,72 @@ function getSessionId(){
     return currentSessionId;
 }
 
-function persistTrialCheckpoint(){
+function checkpointUploadPayload(rows){
+    return {
+        spreadsheet_id: sheetSpreadsheetId,
+        worksheet_name: sheetWorksheetName,
+        schema_version: eventSchemaVersion,
+        checkpoint: true,
+        session_id: getSessionId(),
+        rows: rows
+    };
+}
+
+async function syncPendingTrialRows(){
+    if (checkpointSyncInProgress){
+        checkpointSyncQueued = true;
+        return { ok: false, queued: true };
+    }
+
+    var syncStart = lastSyncedTrialCount;
+    var pendingRows = (trialEventRows || []).slice(syncStart);
+    if (!pendingRows.length){
+        return { ok: true, rows: 0, chunks: 0 };
+    }
+
+    checkpointSyncInProgress = true;
+    checkpointSyncQueued = false;
+    var uploaded = 0;
+    var chunks = 0;
+    try {
+        for (var start = 0; start < pendingRows.length; start += 25){
+            var chunk = pendingRows.slice(start, start + 25);
+            var result = await postWithRetries(sheetAppsUrl, checkpointUploadPayload(chunk), 2);
+            if (!result.ok){
+                return { ok: false, rows: uploaded, chunks: chunks, error: result.error };
+            }
+            uploaded += chunk.length;
+            chunks++;
+            lastSyncedTrialCount = syncStart + uploaded;
+        }
+        return { ok: true, rows: uploaded, chunks: chunks };
+    } finally {
+        checkpointSyncInProgress = false;
+        if (checkpointSyncQueued){
+            checkpointSyncQueued = false;
+            void syncPendingTrialRows();
+        }
+    }
+}
+
+function flushPendingTrialRowsWithBeacon(){
+    if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function"){
+        return false;
+    }
+    var pendingRows = (trialEventRows || []).slice(lastSyncedTrialCount);
+    var sentAny = false;
+    for (var start = 0; start < pendingRows.length; start += 25){
+        var chunk = pendingRows.slice(start, start + 25);
+        var blob = new Blob(
+            [JSON.stringify(checkpointUploadPayload(chunk))],
+            { type: "text/plain;charset=utf-8" }
+        );
+        sentAny = navigator.sendBeacon(sheetAppsUrl, blob) || sentAny;
+    }
+    return sentAny;
+}
+
+function persistTrialCheckpoint(syncRemote){
     try {
         var payload = {
             session_id: getSessionId(),
@@ -193,6 +258,13 @@ function persistTrialCheckpoint(){
     } catch (e){
         console.warn("checkpoint save failed", e);
     }
+    if (syncRemote !== false && (trialEventRows || []).length){
+        void syncPendingTrialRows();
+    }
+}
+
+if (typeof window !== "undefined" && window.addEventListener){
+    window.addEventListener("pagehide", flushPendingTrialRowsWithBeacon);
 }
 
 function validateRows(rows){
@@ -442,7 +514,10 @@ async function sendToSheets() {
         acceptedChunks.push(postResult.result);
     }
 
-    persistTrialCheckpoint();
+    if (okAll){
+        lastSyncedTrialCount = trialRows.length;
+    }
+    persistTrialCheckpoint(false);
     if (okAll){
         localStorage.removeItem("pilot2_checkpoint_" + getSessionId());
     }
