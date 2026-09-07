@@ -97,9 +97,15 @@ var preSurveyResponses = {
     complexityImageB: ""
 };
 var postSurveyResponses = {
-    rememberedImage: "",
-    rememberFeaturesA: "",
-    rememberFeaturesB: "",
+    version: "target-hit-miss-v1",
+    hitImageId: "",
+    hitImageUrl: "",
+    hitDescription: "",
+    hitFeatures: "",
+    missImageId: "",
+    missImageUrl: "",
+    missDescription: "",
+    missFeatures: "",
     studyComments: ""
 };
 var experimentCompleted = false;
@@ -198,9 +204,9 @@ var submissionInProgress = false;
 var sheetAppsUrl = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec";
 var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
 var sheetWorksheetName = "raw_events";
-var eventSchemaVersion = "pilot2-event-v2";
+var eventSchemaVersion = "pilot2-event-v3";
 var stimulusCatalogVersion = "pilot2_balanced_targets_v2";
-var clientBuildId = "pilot2-remote-checkpoint-v4";
+var clientBuildId = "pilot2-post-questionnaire-v5";
 
 function currentRunMode(){
     return /^QA_/.test(String(pid || "")) ? "qa" : "production";

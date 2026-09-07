@@ -27,6 +27,7 @@ function element(id) {
       setAttribute() {},
       addEventListener() {},
       querySelector() { return null; },
+      querySelectorAll() { return []; },
       reportValidity() { return true; },
       async decode() { imageDecodeCount++; },
     });
@@ -145,9 +146,15 @@ function resetSession() {
     complexVizDesc: 'pipeline pre survey marker',
   };
   ctx.postSurveyResponses = {
-    rememberedImage: '',
-    rememberFeaturesA: 'pipeline post A',
-    rememberFeaturesB: 'pipeline post B',
+    version: 'target-hit-miss-v1',
+    hitImageId: 'hit-target',
+    hitImageUrl: 'https://example.test/hit-target.png',
+    hitDescription: 'pipeline hit description',
+    hitFeatures: 'pipeline hit features',
+    missImageId: 'miss-target',
+    missImageUrl: 'https://example.test/miss-target.png',
+    missDescription: 'pipeline miss description',
+    missFeatures: 'pipeline miss features',
     studyComments: 'pipeline comments',
   };
   element('endingout').value = 'completed';
@@ -162,6 +169,43 @@ function setTinyLevel(level, imageName) {
   ctx.trialOnsetTimestamps = [ctx.performance.now() - 1000, ctx.performance.now()];
   ctx.trialResponseTimes = [];
   ctx.trialResponseWindows = [];
+}
+
+function postTrial({ level, trial, imageId, trialType, hit, miss }) {
+  return {
+    event_type: 'trial',
+    event_id: `QA_PIPELINE-session:level:${level}:trial:${trial}`,
+    timestamp_iso: new Date().toISOString(),
+    user_id: 'QA_PIPELINE',
+    participant_id: 'QA_PIPELINE',
+    session_id: 'QA_PIPELINE-session',
+    study_version: 'pilot2-v1',
+    level_index: level,
+    trial_index: trial,
+    image_id: imageId,
+    image_url: `https://example.test/${imageId}.png`,
+    trial_type: trialType,
+    is_repeat: 1,
+    expected_response: 1,
+    participant_response: hit ? 1 : 0,
+    is_correct: hit ? 1 : 0,
+    rt_ms: hit ? 450 : '',
+    repeat_lag: trialType === 'target_repeat' ? 100 : 4,
+    vigilance_flag: trialType === 'vigilance_repeat' ? 1 : 0,
+    false_alarm_flag: 0,
+    hit_flag: hit ? 1 : 0,
+    miss_flag: miss ? 1 : 0,
+    quality_gate_status: 'ok',
+    quality_gate_reason: '',
+    levels_completed: 2,
+    stop_after_level: '',
+    pre_survey_submitted: 1,
+    post_survey_submitted: 0,
+    pre_q1: '', pre_q2: '', pre_q3: '', pre_q4: '', pre_q5: '',
+    post_q1: '', post_q2: '', post_q3: '', post_q4: '',
+    post_q5: '', post_q6: '', post_q7: '', post_q8: '',
+    client_meta_json: '{}',
+  };
 }
 
 async function main() {
@@ -265,9 +309,9 @@ async function main() {
   assert.strictEqual(trialMeta.assignment_hash, 'e5f60718');
   assert.strictEqual(trialMeta.level_sequence_hash, '11111111');
   assert.strictEqual(trialMeta.run_mode, 'qa');
-  assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v2');
+  assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v3');
   assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(trialMeta.client_build_id, 'pilot2-remote-checkpoint-v4');
+  assert.strictEqual(trialMeta.client_build_id, 'pilot2-post-questionnaire-v5');
   assert.strictEqual(trialMeta.stimulus_timing, 'preloaded-double-buffer-raf-deadline-v2');
 
   resetSession();
@@ -302,6 +346,72 @@ async function main() {
   ctx.fullsequence = ['A.png', ctx.fixation_address, 'B.png', ctx.fixation_address, 'A.png', ctx.fixation_address];
   ctx.typesequence = [1, 0, 3, 0, 2, 0];
   assert.strictEqual(ctx.repeatLagForIndex(4), 2);
+
+  resetSession();
+  ctx.fullsequence = [];
+  ctx.typesequence = [];
+  ctx.perfsequence = [];
+  ctx.imCount = -1;
+  ctx.trialEventRows = [
+    postTrial({ level: 1, trial: 182, imageId: 'hit-level-1', trialType: 'target_repeat', hit: true, miss: false }),
+    postTrial({ level: 2, trial: 186, imageId: 'miss-level-2', trialType: 'target_repeat', hit: false, miss: true }),
+    postTrial({ level: 2, trial: 20, imageId: 'vigilance-hit', trialType: 'vigilance_repeat', hit: true, miss: false }),
+  ];
+  const selectedPostImages = ctx.selectPostSurveyImages();
+  assert.strictEqual(selectedPostImages.length, 2, 'post questionnaire must select one hit and one miss');
+  assert.deepStrictEqual(Array.from(selectedPostImages, sample => sample.outcome).sort(), ['hit', 'miss']);
+  assert(selectedPostImages.every(sample => sample.imageId !== 'vigilance-hit'), 'vigilance repeats must not enter the post questionnaire');
+  assert.deepStrictEqual(Array.from(selectedPostImages, sample => sample.levelIndex).sort(), [1, 2], 'post questionnaire must use recorded rows across completed levels');
+  const completePostSurveyRows = ctx.trialEventRows.slice();
+  ctx.trialEventRows = [completePostSurveyRows[0]];
+  assert.deepStrictEqual(Array.from(ctx.selectPostSurveyImages(), sample => sample.outcome), ['hit'], 'a missing outcome must remain blank rather than be mislabeled');
+  ctx.trialEventRows = completePostSurveyRows;
+
+  ctx.postSurveyVisible = false;
+  ctx.showPostSurvey();
+  assert(ctx.document.body.innerHTML.includes('Please describe this image in your own words.'));
+  assert(ctx.document.body.innerHTML.includes('helped you remember it'));
+  assert(ctx.document.body.innerHTML.includes('made it difficult to remember'));
+  const renderedPostImages = JSON.parse(element('post-image-options').value);
+  assert.strictEqual(renderedPostImages.length, 2);
+  const renderedHit = renderedPostImages.find(sample => sample.outcome === 'hit');
+  const renderedMiss = renderedPostImages.find(sample => sample.outcome === 'miss');
+  assert(renderedHit && renderedMiss, 'rendered questionnaire must retain hit/miss identities');
+
+  element('hit-description').value = 'A chart with a strong diagonal line.';
+  element('hit-features').value = 'The high-contrast diagonal line helped me remember it.';
+  element('miss-description').value = 'A dense chart with several small regions.';
+  element('miss-features').value = 'The many similar small regions made it difficult to remember.';
+  element('study-comments').value = 'post questionnaire pipeline test';
+  const postSurveyRequests = [];
+  ctx.fetch = async (url, options) => {
+    const payload = JSON.parse(options.body);
+    postSurveyRequests.push({ url, options, payload });
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { ok: true, received: payload.rows.length, appended: payload.rows.length, duplicates: 0, sheet: 'test:raw_events' };
+      },
+    };
+  };
+  await element('form').onsubmit({ preventDefault() {} });
+  const postSurveyRows = postSurveyRequests.flatMap(request => request.payload.rows);
+  const postSurveySummary = postSurveyRows.find(row => row.event_type === 'session_end');
+  assert(postSurveySummary, 'post questionnaire submission must include a session_end row');
+  assert.strictEqual(postSurveySummary.post_q1, 'A chart with a strong diagonal line.');
+  assert.strictEqual(postSurveySummary.post_q2, 'The high-contrast diagonal line helped me remember it.');
+  assert.strictEqual(postSurveySummary.post_q3, 'A dense chart with several small regions.');
+  assert.strictEqual(postSurveySummary.post_q4, 'The many similar small regions made it difficult to remember.');
+  assert.strictEqual(postSurveySummary.post_q5, renderedHit.imageId);
+  assert.strictEqual(postSurveySummary.post_q6, renderedMiss.imageId);
+  assert.strictEqual(postSurveySummary.post_q7, 'post questionnaire pipeline test');
+  assert.strictEqual(postSurveySummary.post_q8, 'target-hit-miss-v1');
+  const postSurveyMeta = JSON.parse(postSurveySummary.client_meta_json);
+  assert.strictEqual(postSurveyMeta.post_raw.hitImageId, renderedHit.imageId);
+  assert.strictEqual(postSurveyMeta.post_raw.missImageId, renderedMiss.imageId);
+  assert.strictEqual(postSurveyMeta.schema_version, 'pilot2-event-v3');
+  assert.strictEqual(postSurveyMeta.client_build_id, 'pilot2-post-questionnaire-v5');
 
   resetSession();
   ctx.trialEventRows = Array.from({ length: 240 }, (_, index) => ({
@@ -412,20 +522,28 @@ async function main() {
   assert(requests.every(request => request.options.mode === 'cors'));
   assert(requests.every(request => request.options.headers['Content-Type'] === 'text/plain;charset=utf-8'));
   assert(requests.every(request => request.payload.worksheet_name === 'raw_events'));
-  assert(requests.every(request => request.payload.schema_version === 'pilot2-event-v2'));
+  assert(requests.every(request => request.payload.schema_version === 'pilot2-event-v3'));
   assert.strictEqual(requests.reduce((sum, request) => sum + request.payload.rows.length, 0), 241);
   assert.strictEqual(requests[0].payload.rows[0].pre_q2, 'other|self:pipeline-self-description');
   const sentRows = requests.flatMap(request => request.payload.rows);
   const summaryRow = sentRows.find(row => row.event_type === 'session_end');
+  assert.strictEqual(summaryRow.post_q1, 'pipeline hit description');
+  assert.strictEqual(summaryRow.post_q2, 'pipeline hit features');
+  assert.strictEqual(summaryRow.post_q3, 'pipeline miss description');
+  assert.strictEqual(summaryRow.post_q4, 'pipeline miss features');
+  assert.strictEqual(summaryRow.post_q5, 'hit-target');
+  assert.strictEqual(summaryRow.post_q6, 'miss-target');
+  assert.strictEqual(summaryRow.post_q7, 'pipeline comments');
+  assert.strictEqual(summaryRow.post_q8, 'target-hit-miss-v1');
   const summaryMeta = JSON.parse(summaryRow.client_meta_json);
   assert.strictEqual(summaryMeta.sequence_algorithm, 'pilot2-session-sequence-v2');
   assert.strictEqual(summaryMeta.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(summaryMeta.assignment_hash, 'e5f60718');
   assert.deepStrictEqual(summaryMeta.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
   assert.strictEqual(summaryMeta.run_mode, 'qa');
-  assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v2');
+  assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v3');
   assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-remote-checkpoint-v4');
+  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-post-questionnaire-v5');
 
   localData.clear();
   let failedRequests = 0;
@@ -443,9 +561,9 @@ async function main() {
   assert.strictEqual(checkpoint.assignment_hash, 'e5f60718');
   assert.deepStrictEqual(checkpoint.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
   assert.strictEqual(checkpoint.run_mode, 'qa');
-  assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v2');
+  assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v3');
   assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(checkpoint.client_build_id, 'pilot2-remote-checkpoint-v4');
+  assert.strictEqual(checkpoint.client_build_id, 'pilot2-post-questionnaire-v5');
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');
@@ -468,6 +586,9 @@ async function main() {
       heldSpaceIgnored: true,
       onePracticeResponsePerImage: true,
       repeatLagCalculated: true,
+      targetOnlyPostSurveySampling: true,
+      postSurveyHitMissPromptsRendered: true,
+      postSurveyResponsesMapped: true,
       sequenceMetadataInTrials: true,
       sequenceMetadataInSummary: true,
       sequenceMetadataInCheckpoint: true,

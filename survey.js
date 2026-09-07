@@ -357,14 +357,14 @@ async function sendToSheets() {
         pre_q3: preSurveyResponses.age || "",
         pre_q4: preSurveyResponses.education || "",
         pre_q5: preSurveyResponses.complexVizDesc || "",
-        post_q1: postSurveyResponses.rememberFeaturesA || "",
-        post_q2: postSurveyResponses.rememberFeaturesB || "",
-        post_q3: postSurveyResponses.studyComments || "",
-        post_q4: "",
-        post_q5: "",
-        post_q6: "",
-        post_q7: "",
-        post_q8: ""
+        post_q1: postSurveyResponses.hitDescription || "",
+        post_q2: postSurveyResponses.hitFeatures || "",
+        post_q3: postSurveyResponses.missDescription || "",
+        post_q4: postSurveyResponses.missFeatures || "",
+        post_q5: postSurveyResponses.hitImageId || "",
+        post_q6: postSurveyResponses.missImageId || "",
+        post_q7: postSurveyResponses.studyComments || "",
+        post_q8: postSurveyResponses.version || "target-hit-miss-v1"
     };
 
     const trialRows = (trialEventRows || []).map(function(row){
@@ -502,8 +502,12 @@ async function sendToSheets() {
             pre_age: preSurveyResponses.age,
             pre_education: preSurveyResponses.education,
             pre_complex_viz_desc: preSurveyResponses.complexVizDesc,
-            post_remember_features_a: postSurveyResponses.rememberFeaturesA,
-            post_remember_features_b: postSurveyResponses.rememberFeaturesB,
+            post_hit_image_id: postSurveyResponses.hitImageId,
+            post_hit_description: postSurveyResponses.hitDescription,
+            post_hit_features: postSurveyResponses.hitFeatures,
+            post_miss_image_id: postSurveyResponses.missImageId,
+            post_miss_description: postSurveyResponses.missDescription,
+            post_miss_features: postSurveyResponses.missFeatures,
             post_study_comments: postSurveyResponses.studyComments
         };
         var postResult = await postWithRetries(appsURL, payload, 3);

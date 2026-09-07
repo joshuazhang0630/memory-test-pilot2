@@ -1053,18 +1053,31 @@ function showPostSurvey(){
 	saveProgress();
 	stopExperimentTimer();
 	var rememberedSample = selectPostSurveyImages();
-	var rememberedHtml = rememberedSample.map(function(url, index){
-		var label = imageLabelFromUrl(url);
-		var textareaId = index === 0 ? "remember-features-a" : "remember-features-b";
-		var textareaName = index === 0 ? "remember_features_a" : "remember_features_b";
+	var rememberedHtml = rememberedSample.map(function(sample){
+		var label = imageLabelFromUrl(sample.imageUrl);
+		var isHit = sample.outcome === "hit";
+		var outcomeLabel = isHit ? "Correctly recognized repeat" : "Missed repeat";
+		var outcomeExplanation = isHit
+			? "You correctly identified this image when it repeated."
+			: "You did not identify this image when it repeated.";
+		var featurePrompt = isHit
+			? "Which features of this image do you think helped you remember it?"
+			: "Which features of this image do you think made it difficult to remember?";
 		return `
-			<div class="image-choice">
-				<div><strong>${label}</strong></div>
-				<img src="${url}" alt="${label}">
-				<textarea id="${textareaId}" name="${textareaName}" class="textarea-field" required placeholder="Describe the feature(s) that helped you remember."></textarea>
-			</div>
-		`;
+				<div class="image-choice" data-outcome="${sample.outcome}">
+					<div><strong>${outcomeLabel}</strong></div>
+					<p class="small-note">${outcomeExplanation}</p>
+					<img src="${sample.imageUrl}" alt="${label}">
+					<label class="muted-text" for="${sample.outcome}-description">Please describe this image in your own words. *</label>
+					<textarea id="${sample.outcome}-description" name="${sample.outcome}_description" class="textarea-field" required placeholder="Describe the image."></textarea>
+					<label class="muted-text" for="${sample.outcome}-features">${featurePrompt} *</label>
+					<textarea id="${sample.outcome}-features" name="${sample.outcome}_features" class="textarea-field" required placeholder="Describe the relevant image features."></textarea>
+				</div>
+			`;
 	}).join("");
+	var sampleNotice = rememberedSample.length
+		? ""
+		: '<p class="small-note">No eligible target-repeat image was available for these questions.</p>';
 	var content = `
 		<form id="form" class="card" autocomplete="off">
 			<input type="hidden" name="imseq" id="imseqout" value="">
@@ -1075,11 +1088,11 @@ function showPostSurvey(){
 
 			<h1 class="section-title">Post-sequence questions</h1>
 			<div class="question-block">
-				<label class="muted-text">Describe what features make each image memorable. *</label>
-                <p class="small-note">Example: “The bright red diagonal line and the clustered dots in the upper-left made it memorable.”</p>
+				<p class="muted-text">Please answer two questions about each selected target image.</p>
 				<div class="image-pair">
 					${rememberedHtml}
 				</div>
+				${sampleNotice}
 			</div>
 			<div class="question-block">
 				<label class="muted-text" for="study-comments">What comments do you have about the study?</label>
@@ -1102,7 +1115,7 @@ function showPostSurvey(){
 	if (imtypeInput){ imtypeInput.value = imtypestring; }
 	if (perfInput){ perfInput.value = perfstring; }
 	if (endingInput){ endingInput.value = endingStatus || "completed"; }
-	if (postOptionsInput){ postOptionsInput.value = rememberedSample.join(","); }
+	if (postOptionsInput){ postOptionsInput.value = JSON.stringify(rememberedSample); }
 
 	var postForm = document.getElementById("form");
 	if (postForm){
@@ -1127,9 +1140,21 @@ function showPostSurvey(){
 			if (submitStatus){
 				submitStatus.textContent = "Saving all trial and questionnaire data...";
 			}
-			postSurveyResponses.rememberedImage = "";
-			postSurveyResponses.rememberFeaturesA = (document.getElementById("remember-features-a").value || "").trim();
-			postSurveyResponses.rememberFeaturesB = (document.getElementById("remember-features-b").value || "").trim();
+			var hitSample = rememberedSample.find(function(sample){ return sample.outcome === "hit"; }) || null;
+			var missSample = rememberedSample.find(function(sample){ return sample.outcome === "miss"; }) || null;
+			function postSurveyValue(id){
+				var field = document.getElementById(id);
+				return field ? (field.value || "").trim() : "";
+			}
+			postSurveyResponses.version = "target-hit-miss-v1";
+			postSurveyResponses.hitImageId = hitSample ? hitSample.imageId : "";
+			postSurveyResponses.hitImageUrl = hitSample ? hitSample.imageUrl : "";
+			postSurveyResponses.hitDescription = postSurveyValue("hit-description");
+			postSurveyResponses.hitFeatures = postSurveyValue("hit-features");
+			postSurveyResponses.missImageId = missSample ? missSample.imageId : "";
+			postSurveyResponses.missImageUrl = missSample ? missSample.imageUrl : "";
+			postSurveyResponses.missDescription = postSurveyValue("miss-description");
+			postSurveyResponses.missFeatures = postSurveyValue("miss-features");
 			postSurveyResponses.studyComments = (document.getElementById("study-comments").value || "").trim();
 			var submissionResult = await sendToSheets();
 			if (!submissionResult || !submissionResult.ok){
@@ -1158,57 +1183,36 @@ function showPostSurvey(){
 }
 
 function selectPostSurveyImages(){
-	var hitIndexes = {};
-	var missIndexes = {};
-	for (var i = 0; i < typesequence.length; i++){
-		var t = typesequence[i];
-		if (t === REPEAT || t === VIGILANCE){
-			if (perfsequence[i] === HIT){
-				hitIndexes[i] = true;
-			} else if (perfsequence[i] === MISS){
-				missIndexes[i] = true;
-			}
+	var hits = [];
+	var misses = [];
+	(trialEventRows || []).forEach(function(row){
+		if (!row || row.event_type !== "trial" || row.trial_type !== "target_repeat" || !row.image_url){
+			return;
 		}
-	}
-	for (var j = 1; j < typesequence.length; j++){
-		if (typesequence[j] === FIXATION && perfsequence[j] === HIT){
-			var prevType = typesequence[j - 1];
-			if (prevType === REPEAT || prevType === VIGILANCE){
-				hitIndexes[j - 1] = true;
-				delete missIndexes[j - 1];
-			}
+		var candidate = {
+			outcome: "",
+			imageId: row.image_id || imageIdFromUrl(row.image_url),
+			imageUrl: row.image_url,
+			levelIndex: row.level_index,
+			trialIndex: row.trial_index
+		};
+		if (Number(row.hit_flag) === 1){
+			candidate.outcome = "hit";
+			hits.push(candidate);
+		} else if (Number(row.miss_flag) === 1){
+			candidate.outcome = "miss";
+			misses.push(candidate);
 		}
-	}
-
-	var hits = Object.keys(hitIndexes).map(function(key){
-		return fullsequence[Number(key)];
-	});
-	var misses = Object.keys(missIndexes).map(function(key){
-		return fullsequence[Number(key)];
 	});
 	shuffleArray(hits);
 	shuffleArray(misses);
 
 	var selection = [];
+	if (hits.length > 0){
+		selection.push(hits[0]);
+	}
 	if (misses.length > 0){
 		selection.push(misses[0]);
-		if (hits.length > 0){
-			selection.push(hits.find(function(url){ return url !== misses[0]; }) || hits[0]);
-		} else if (misses.length > 1){
-			selection.push(misses[1]);
-		}
-	} else {
-		selection = hits.slice(0, 2);
-	}
-
-	if (selection.length < 2){
-		var pool = (sessionImagesCatalog && sessionImagesCatalog.length ? sessionImagesCatalog : (allImagesCatalog || [])).slice();
-		shuffleArray(pool);
-		for (var k = 0; k < pool.length && selection.length < 2; k++){
-			if (selection.indexOf(pool[k]) === -1){
-				selection.push(pool[k]);
-			}
-		}
 	}
 	return selection;
 }

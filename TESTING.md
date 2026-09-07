@@ -57,11 +57,17 @@ For a browser-driven local run, open `http://localhost:8765/?qa_fast=1`. The fla
 
 This posts one smoke row through the same Apps Script backend used by the game, then reads the Google Sheet back with `gog` and prints `backend_sheet_write_ok tag=...` only if the tag is found. If `gog` reports `invalid_grant`, refresh auth first with `gog login jiayuez720081@gmail.com`.
 
+## Post-questionnaire Sheet Round-trip Test
+
+- Run `node scripts/check_post_questionnaire_write.js`.
+
+This posts one `QA_POST_...` session summary through the production Apps Script endpoint, reads the appended `raw_events` row back through Google Sheets, and verifies all eight post-questionnaire fields plus the structured `client_meta_json.post_raw` object. The QA participant prefix keeps the test record excluded from analysis.
+
 ## Data Pipeline Regression Test
 
 - Run `node scripts/check_data_pipeline.js`.
 
-This verifies cross-level sequence separators and event IDs, unique-image preload/decode behavior, 15-second preload failure handling, double-buffered frame activation, 1,000 ms image and 1,400 ms fixation deadlines, transition/fixation response attribution, held-key and duplicate-response suppression, Borkin practice-rate boundaries, manifest revision cache busting, response time and repeat-lag capture, 25-row chunking into the hidden `raw_events` audit tab with verified Apps Script JSON acknowledgements, remote checkpoint uploads for unfinished sessions, page-exit beacon payloads, retained local checkpoints after failed uploads, and a single post-survey submit handler.
+This verifies cross-level sequence separators and event IDs, unique-image preload/decode behavior, 15-second preload failure handling, double-buffered frame activation, 1,000 ms image and 1,400 ms fixation deadlines, transition/fixation response attribution, held-key and duplicate-response suppression, Borkin practice-rate boundaries, manifest revision cache busting, response time and repeat-lag capture, target-only hit/miss post-questionnaire sampling across levels, the four required post-questionnaire text responses and selected image IDs, 25-row chunking into the hidden `raw_events` audit tab with verified Apps Script JSON acknowledgements, remote checkpoint uploads for unfinished sessions, page-exit beacon payloads, retained local checkpoints after failed uploads, and a single post-survey submit handler.
 
 ## Session Sequence Constraint Test
 
