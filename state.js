@@ -58,12 +58,10 @@ Additional 2024 updates:
 
 
 var fixation_address = "https://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
-var targetManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/target/manifest.json";
-var fillerManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/filler/manifest.json";
-var pretrainManifestUrl = "https://ivcl.jiangsn.com/visPilot2Dataset/pretrain/manifest.json";
-var studyVersion = "pilot2-v1";
+var stimulusCatalogUrl = "./stimulus-catalog.json";
+var studyVersion = "pilot2-shared-targets-v1";
 var studySalt = "pilot2-session-randomized-v2";
-var sequenceAlgorithm = "pilot2-session-sequence-v2";
+var sequenceAlgorithm = "pilot2-stratified-shared-pool-v1";
 var sequenceContext = {
     algorithm: sequenceAlgorithm,
     seedInput: "",
@@ -76,7 +74,6 @@ var images = [];
 var allImagesCatalog = [];
 var imageLoadPromise = null;
 var manifestData = null;
-var pretestImages = [];
 var availableLevels = [];
 var completedLevels = [];
 var currentLevelKey = "";
@@ -134,6 +131,7 @@ var experimentStartTimestamp = null;
 var timerInterval = null;
 
 // Pretrain variables
+var practiceSessionId = "";
 var pretrainImages = []; // Will store URLs of images used for pretrain
 var pretrainSequence = []; // Full pretrain sequence with repeats
 var pretrainTypeSequence = []; // Type of each pretrain trial
@@ -205,8 +203,8 @@ var sheetAppsUrl = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivO
 var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
 var sheetWorksheetName = "raw_events";
 var eventSchemaVersion = "pilot2-event-v3";
-var stimulusCatalogVersion = "pilot2_balanced_targets_v2";
-var clientBuildId = "pilot2-post-questionnaire-v5";
+var stimulusCatalogVersion = "pilot2_shared_targets_1800_v1";
+var clientBuildId = "pilot2-shared-targets-v1";
 
 function currentRunMode(){
     return /^QA_/.test(String(pid || "")) ? "qa" : "production";

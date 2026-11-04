@@ -1,103 +1,23 @@
-function normalizeBaseUrl(base){
-    if (!base){
-        return "";
+async function loadStimulusCatalog(){
+    const response = await fetch(stimulusCatalogUrl, { cache: "no-store" });
+    if (!response.ok){
+        throw new Error("Stimulus catalog HTTP " + response.status);
     }
-    return base.endsWith("/") ? base : (base + "/");
-}
-
-async function fetchManifest(url){
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok){
-        throw new Error("Manifest HTTP " + res.status + " @ " + url);
+    const catalog = await response.json();
+    if (catalog.version !== stimulusCatalogVersion || catalog.images.length !== 1800){
+        throw new Error("Unexpected stimulus catalog version or size");
     }
-    const manifest = await res.json();
-    return {
-        sourceUrl: url,
-        baseUrl: normalizeBaseUrl(manifest.baseUrl || ""),
-        revision: String(manifest.revision || ""),
-        files: Array.isArray(manifest.files) ? manifest.files : []
-    };
-}
-
-async function loadManifests(){
-    const targetManifest = await fetchManifest(targetManifestUrl);
-    const fillerManifest = await fetchManifest(fillerManifestUrl);
-    const pretrainManifest = await fetchManifest(pretrainManifestUrl);
-    return { targetManifest: targetManifest, fillerManifest: fillerManifest, pretrainManifest: pretrainManifest };
-}
-
-function resolveManifestUrl(base, name, revision){
-    if (!name){
-        return "";
-    }
-    var resolved = name.startsWith("http") ? name : (normalizeBaseUrl(base) + name);
-    if (!revision){
-        return resolved;
-    }
-    return resolved + (resolved.indexOf("?") === -1 ? "?" : "&") + "v=" + encodeURIComponent(revision);
-}
-
-function basenameWithoutExt(path){
-    if (!path){
-        return "";
-    }
-    const base = path.split("/").pop() || path;
-    const dot = base.lastIndexOf(".");
-    return dot > 0 ? base.substring(0, dot) : base;
-}
-
-function buildGlobalRegistry(targetManifest, fillerManifest, pretrainManifest){
-    var registry = {
-        targets: [],
-        fillers: [],
-        pretest: [],
-        byId: {}
-    };
-
-    function pushRecord(kind, fileName, baseUrl, revision){
-        var url = resolveManifestUrl(baseUrl, fileName, revision);
-        var imageId = basenameWithoutExt(fileName);
-        if (!imageId){
-            return;
-        }
-        if (registry.byId[imageId]){
-            // keep strict uniqueness by id
-            var disambiguated = imageId + "__" + kind + "__" + (Object.keys(registry.byId).length + 1);
-            imageId = disambiguated;
-        }
-        var rec = {
-            imageId: imageId,
-            fileName: fileName,
-            url: url,
-            role: kind
+    const images = catalog.images.map(function(record){
+        return {
+            url: catalog.baseUrl + encodeURIComponent(record.filename),
+            stratum: record.stratum
         };
-        registry.byId[imageId] = rec;
-        if (kind === "target"){
-            registry.targets.push(rec);
-        } else {
-            registry.fillers.push(rec);
-        }
+    });
+    if (new Set(images.map(function(record){ return record.url; })).size !== images.length ||
+        images.some(function(record){ return !record.stratum; })){
+        throw new Error("Stimulus catalog contains duplicate URLs or missing strata");
     }
-
-    targetManifest.files.forEach(function(name){ pushRecord("target", name, targetManifest.baseUrl, targetManifest.revision); });
-    fillerManifest.files.forEach(function(name){ pushRecord("filler", name, fillerManifest.baseUrl, fillerManifest.revision); });
-
-    var formalUrls = {};
-    var formalNames = {};
-    registry.targets.concat(registry.fillers).forEach(function(rec){
-        formalUrls[rec.url] = true;
-        formalNames[(rec.fileName || "").split("/").pop()] = true;
-    });
-
-    (pretrainManifest.files || []).forEach(function(name){
-        var fileName = (name || "").split("/").pop();
-        var url = resolveManifestUrl(pretrainManifest.baseUrl, name, pretrainManifest.revision);
-        if (!fileName || formalUrls[url] || formalNames[fileName]){
-            return;
-        }
-        registry.pretest.push(url);
-    });
-    return registry;
+    return images;
 }
 
 function hashString(str){
@@ -142,20 +62,47 @@ function makeSequenceRng(label){
     return makeSeededRng(hashString(sequenceContext.seedInput + "|" + label));
 }
 
-function splitIntoLevels(items, levelCount){
-    var levels = [];
-    for (var i = 0; i < levelCount; i++){
-        levels.push([]);
-    }
-    items.forEach(function(item, idx){
-        levels[idx % levelCount].push(item);
+function makeStratifiedSampler(records, rng){
+    var groups = new Map();
+    records.forEach(function(record){
+        if (!groups.has(record.stratum)){
+            groups.set(record.stratum, []);
+        }
+        groups.get(record.stratum).push(record);
     });
-    return levels;
+    var buckets = Array.from(groups.values(), function(group){
+        return shuffleWithRng(group, rng);
+    });
+
+    return function draw(count){
+        var total = buckets.reduce(function(sum, bucket){ return sum + bucket.length; }, 0);
+        if (count > total){
+            throw new Error("Not enough images in the shared stimulus catalog");
+        }
+        // One random offset rounds proportional quotas while preserving the total.
+        var offset = rng();
+        var cumulative = 0;
+        var selected = [];
+        shuffleWithRng(buckets, rng).forEach(function(bucket){
+            var before = Math.floor(cumulative * count / total + offset);
+            cumulative += bucket.length;
+            var quota = Math.floor(cumulative * count / total + offset) - before;
+            for (var i = 0; i < quota; i++){
+                selected.push(bucket.pop().url);
+            }
+        });
+        return selected;
+    };
+}
+
+function practiceImagesForSession(participantId, sessionId){
+    var rng = makeSeededRng(hashString(stimulusCatalogVersion + "|practice|" + participantId + "|" + sessionId));
+    return makeStratifiedSampler(manifestData.catalog, rng)(17);
 }
 
 function initializeParticipantLevels(participantId, sessionId){
-    if (!manifestData || !manifestData.registry){
-        throw new Error("Manifest registry not loaded");
+    if (!manifestData || !manifestData.catalog){
+        throw new Error("Stimulus catalog not loaded");
     }
     var levelCount = activeLevelCount || 5;
     var levelKeys = [];
@@ -166,24 +113,25 @@ function initializeParticipantLevels(participantId, sessionId){
     var normalizedParticipantId = String(participantId || "anon");
     var normalizedSessionId = String(sessionId || currentSessionId || (normalizedParticipantId + "-session"));
     var seedInput = [
-        sequenceAlgorithm || "pilot2-session-sequence-v2",
+        sequenceAlgorithm,
         studyVersion || "pilot2-v1",
         studySalt || "salt",
         normalizedParticipantId,
         normalizedSessionId
     ].join("|");
     sequenceContext = {
-        algorithm: sequenceAlgorithm || "pilot2-session-sequence-v2",
+        algorithm: sequenceAlgorithm,
         seedInput: seedInput,
         seedHash: hashHex(seedInput),
         assignmentHash: "",
         levelSequenceHashes: {}
     };
 
-    var targetRng = makeSequenceRng("target-pool");
-    var fillerRng = makeSequenceRng("filler-pool");
-    var shuffledTargets = shuffleWithRng(manifestData.registry.targets, targetRng);
-    var shuffledFillers = shuffleWithRng(manifestData.registry.fillers, fillerRng);
+    var practiceUrls = new Set(practiceImagesForSession(normalizedParticipantId, normalizedSessionId));
+    var formalPool = manifestData.catalog.filter(function(record){
+        return !practiceUrls.has(record.url);
+    });
+    var draw = makeStratifiedSampler(formalPool, makeSequenceRng("shared-pool"));
 
     var effectiveLevelTrialCount = levelTrialCount;
     if (typeof devFastMode !== "undefined" && devFastMode){
@@ -202,36 +150,14 @@ function initializeParticipantLevels(participantId, sessionId){
 
     var fillerSinglesPerLevel = Math.max(0, effectiveLevelTrialCount - (targetPairsPerLevel * 2) - (vigilancePairsPerLevel * 2));
 
-    var neededTargets = targetPairsPerLevel * levelCount;
-    var neededVigilance = vigilancePairsPerLevel * levelCount;
-    var neededFillers = (fillerSinglesPerLevel * levelCount) + neededVigilance;
-
-    if (shuffledTargets.length < neededTargets){
-        throw new Error("Not enough target images for level design budget");
-    }
-    if (shuffledFillers.length < neededFillers){
-        throw new Error("Not enough filler images for level design budget");
-    }
-
-    var tCursor = 0;
-    var fCursor = 0;
     var levels = {};
-
     levelKeys.forEach(function(levelKey){
-        var levelTargets = shuffledTargets.slice(tCursor, tCursor + targetPairsPerLevel).map(function(r){ return r.url; });
-        tCursor += targetPairsPerLevel;
-
-        var vigilanceSources = shuffledFillers.slice(fCursor, fCursor + vigilancePairsPerLevel).map(function(r){ return r.url; });
-        fCursor += vigilancePairsPerLevel;
-
-        var fillerSingles = shuffledFillers.slice(fCursor, fCursor + fillerSinglesPerLevel).map(function(r){ return r.url; });
-        fCursor += fillerSinglesPerLevel;
-
-        levels[levelKey] = {
-            targets: levelTargets,
-            fillers: fillerSingles.concat(vigilanceSources),
-            vigilance: vigilanceSources
-        };
+        levels[levelKey] = { targets: draw(targetPairsPerLevel) };
+    });
+    levelKeys.forEach(function(levelKey){
+        var level = levels[levelKey];
+        level.vigilance = draw(vigilancePairsPerLevel);
+        level.fillers = draw(fillerSinglesPerLevel).concat(level.vigilance);
     });
 
     var assignmentParts = [];
@@ -251,33 +177,21 @@ function initializeParticipantLevels(participantId, sessionId){
     allImagesCatalog = [];
     availableLevels.forEach(function(levelKey){
         var level = levels[levelKey];
-        allImagesCatalog = allImagesCatalog.concat(level.targets, level.fillers, level.vigilance);
+        allImagesCatalog = allImagesCatalog.concat(level.targets, level.fillers);
     });
     return levels;
 }
 
 function ensureImagesLoaded(){
     if (!imageLoadPromise){
-        imageLoadPromise = loadManifests().then(function(payload){
-            var registry = buildGlobalRegistry(payload.targetManifest, payload.fillerManifest, payload.pretrainManifest);
-            manifestData = {
-                registry: registry,
-                levels: {},
-                source: {
-                    targetManifest: payload.targetManifest.sourceUrl,
-                    fillerManifest: payload.fillerManifest.sourceUrl,
-                    pretrainManifest: payload.pretrainManifest.sourceUrl
-                }
-            };
-            pretestImages = registry.pretest.slice();
+        imageLoadPromise = loadStimulusCatalog().then(function(catalog){
+            manifestData = { catalog: catalog, levels: {} };
             availableLevels = [];
-            allImagesCatalog = registry.targets.map(function(r){ return r.url; }).concat(registry.fillers.map(function(r){ return r.url; }));
-            console.log("Loaded manifests:", registry.targets.length, "targets", registry.fillers.length, "fillers", registry.pretest.length, "pretrain");
+            allImagesCatalog = catalog.map(function(record){ return record.url; });
             return manifestData;
         }).catch(function(err){
             console.error("Failed to load manifests", err);
             manifestData = null;
-            pretestImages = [];
             availableLevels = [];
             allImagesCatalog = [];
             return null;
@@ -288,7 +202,7 @@ function ensureImagesLoaded(){
 
 async function requireImagesReady(){
     await ensureImagesLoaded();
-    if (!manifestData || !manifestData.registry){
+    if (!manifestData || !manifestData.catalog){
         throw new Error("No manifest data loaded");
     }
     return manifestData;

@@ -241,7 +241,10 @@ function preloadStatusMarkup(){
 }
 
 function selectPretrainImages() {
-    var pool = pretestImages.slice();
+    if (!practiceSessionId){
+        practiceSessionId = (pid || "anon") + "-" + Date.now();
+    }
+    var pool = practiceImagesForSession(String(pid || "anon"), practiceSessionId);
     shuffleArray(pool);
     return pool.slice(0, Math.min(17, pool.length));
 }
@@ -692,7 +695,7 @@ function startRealExperiment() {
 	imgstring = "";
 	imtypestring = "";
 	perfstring = "";
-	currentSessionId = (pid || "anon") + "-" + Date.now();
+	currentSessionId = practiceSessionId || ((pid || "anon") + "-" + Date.now());
 	lastCheckpointTrialCount = 0;
 	lastSyncedTrialCount = 0;
 	checkpointSyncInProgress = false;
@@ -1534,7 +1537,7 @@ function typeLabelFromId(typeId){
 }
 
 function imageIdFromUrl(url){
-    var file = (url || "").split("/").pop() || "";
+    var file = decodeURIComponent((url || "").split(/[?#]/)[0].split("/").pop() || "");
     var dot = file.lastIndexOf(".");
     return dot > 0 ? file.substring(0, dot) : file;
 }

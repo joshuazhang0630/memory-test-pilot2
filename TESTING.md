@@ -67,15 +67,15 @@ This posts one `QA_POST_...` session summary through the production Apps Script 
 
 - Run `node scripts/check_data_pipeline.js`.
 
-This verifies cross-level sequence separators and event IDs, unique-image preload/decode behavior, 15-second preload failure handling, double-buffered frame activation, 1,000 ms image and 1,400 ms fixation deadlines, transition/fixation response attribution, held-key and duplicate-response suppression, Borkin practice-rate boundaries, manifest revision cache busting, response time and repeat-lag capture, target-only hit/miss post-questionnaire sampling across levels, the four required post-questionnaire text responses and selected image IDs, 25-row chunking into the hidden `raw_events` audit tab with verified Apps Script JSON acknowledgements, remote checkpoint uploads for unfinished sessions, page-exit beacon payloads, retained local checkpoints after failed uploads, and a single post-survey submit handler.
+This verifies cross-level sequence separators and event IDs, unique-image preload/decode behavior, 15-second preload failure handling, double-buffered frame activation, 1,000 ms image and 1,400 ms fixation deadlines, transition/fixation response attribution, held-key and duplicate-response suppression, Borkin practice-rate boundaries, response time and repeat-lag capture, target-only hit/miss post-questionnaire sampling across levels, the four required post-questionnaire text responses and selected image IDs, 25-row chunking into the hidden `raw_events` audit tab with verified Apps Script JSON acknowledgements, remote checkpoint uploads for unfinished sessions, page-exit beacon payloads, retained local checkpoints after failed uploads, and a single post-survey submit handler.
 
 ## Session Sequence Constraint Test
 
 - Run `node scripts/check_constraints.js`.
 
-This builds 200 synthetic logins for the same participant. It verifies that every login receives a distinct target/filler assignment and image ordering, while replaying the same participant/session seed exactly reproduces the sequence. It also checks complete 32-target/164-filler catalog coverage, cross-level disjointness, per-level 16-target/6-vigilance/76-filler-single counts, target lag 91–109, vigilance lag 1–7, and the absence of null slots or sequence build errors.
+This builds 200 synthetic sessions and replays each seed. It verifies the 1,800-image catalog, proportional stratum quotas, and disjoint practice and formal assignments. Each level still has 16 targets, 6 vigilance images, 76 single fillers, 120 presentations, target lag 91–109, and vigilance lag 1–7.
 
-The formal experiment is seeded per session; practice remains independently randomized. Runtime level assignment comes from the manifests and session seed. Dataset CSV level/position fields are audit metadata and do not fix runtime placement.
+All roles draw without replacement from the shared catalog. Practice reserves 17 images for the session and reshuffles their presentation order on retries. Those images are excluded from both formal levels.
 
 ## Notes
 

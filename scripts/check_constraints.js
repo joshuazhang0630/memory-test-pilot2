@@ -14,7 +14,10 @@ ctx.document = {
   body: { innerHTML: '' },
 };
 ctx.window = ctx;
-ctx.fetch = fetch;
+ctx.fetch = async url => {
+  if (url !== './stimulus-catalog.json') throw new Error('Unexpected catalog URL: ' + url);
+  return { ok: true, json: async () => JSON.parse(load('stimulus-catalog.json')) };
+};
 vm.createContext(ctx);
 
 function load(file) {
@@ -25,13 +28,6 @@ vm.runInContext(load('state.js'), ctx);
 vm.runInContext(load('utils.js'), ctx);
 vm.runInContext(load('data.js'), ctx);
 vm.runInContext(load('experiment.js'), ctx);
-
-if (process.env.PILOT2_TARGET_MANIFEST_URL) {
-  ctx.targetManifestUrl = process.env.PILOT2_TARGET_MANIFEST_URL;
-}
-if (process.env.PILOT2_FILLER_MANIFEST_URL) {
-  ctx.fillerManifestUrl = process.env.PILOT2_FILLER_MANIFEST_URL;
-}
 
 const TARGET = 1;
 const REPEAT = 2;
@@ -58,35 +54,23 @@ function calcLags(sequence, types) {
   return out;
 }
 
-function setEquals(actual, expected) {
-  if (actual.size !== expected.size) return false;
-  for (const value of actual) {
-    if (!expected.has(value)) return false;
-  }
-  return true;
-}
-
 (async () => {
-  await ctx.ensureImagesLoaded();
-  const registry = ctx.manifestData.registry;
-  const targetCatalog = new Set(registry.targets.map(record => record.url));
-  const fillerCatalog = new Set(registry.fillers.map(record => record.url));
-  const targetLevelObservations = new Map([...targetCatalog].map(url => [url, new Set()]));
-  const fillerLevelObservations = new Map([...fillerCatalog].map(url => [url, new Set()]));
-  const targetPositionObservations = new Map([...targetCatalog].map(url => [url, new Set()]));
+  await ctx.requireImagesReady();
+  const catalog = ctx.manifestData.catalog;
+  const catalogUrls = new Set(catalog.map(record => record.url));
+  const strataByUrl = new Map(catalog.map(record => [record.url, record.stratum]));
+  const allTargets = new Set();
+  const allFillers = new Set();
   const sessionHashes = new Set();
 
   const summary = {
     sessions: SESSION_COUNT,
     algorithm: ctx.sequenceAlgorithm,
-    targetCatalogSize: targetCatalog.size,
-    fillerCatalogSize: fillerCatalog.size,
+    catalogSize: catalogUrls.size,
     uniqueSessionSequenceHashes: 0,
     duplicateSessionSequenceHashes: 0,
     sameSessionReproductionMismatches: 0,
-    targetLevelVariationViolations: 0,
-    fillerLevelVariationViolations: 0,
-    targetPositionVariationViolations: 0,
+    stratificationViolations: 0,
     catalogCoverageViolations: 0,
     roleCountViolations: 0,
     overlapViolations: 0,
@@ -101,9 +85,38 @@ function setEquals(actual, expected) {
     ctx.initializeParticipantLevels(participantId, sessionId);
     const levels = ctx.manifestData.levels;
     const levelKeys = Object.keys(levels).sort();
-    const seenAcrossLevels = new Set();
-    const assignedTargets = new Set();
-    const assignedFillers = new Set();
+    const practice = ctx.practiceImagesForSession(participantId, sessionId);
+    const seenAcrossLevels = new Set(practice);
+    if (seenAcrossLevels.size !== 17 || !practice.every(url => catalogUrls.has(url))) {
+      summary.catalogCoverageViolations += 1;
+    }
+    const remaining = new Map();
+    for (const {url, stratum} of catalog) {
+      if (!seenAcrossLevels.has(url)) remaining.set(stratum, (remaining.get(stratum) || 0) + 1);
+    }
+    let remainingCount = catalog.length - practice.length;
+    function checkStratification(urls) {
+      const observed = new Map();
+      for (const url of urls) {
+        const stratum = strataByUrl.get(url);
+        observed.set(stratum, (observed.get(stratum) || 0) + 1);
+      }
+      for (const [stratum, available] of remaining) {
+        const expected = available * urls.length / remainingCount;
+        const actual = observed.get(stratum) || 0;
+        if (actual < Math.floor(expected) || actual > Math.ceil(expected)) {
+          summary.stratificationViolations += 1;
+        }
+        remaining.set(stratum, available - actual);
+      }
+      remainingCount -= urls.length;
+    }
+    for (const key of levelKeys) checkStratification(levels[key].targets);
+    for (const key of levelKeys) {
+      const { vigilance, fillers } = levels[key];
+      checkStratification(vigilance);
+      checkStratification(fillers.filter(url => !vigilance.includes(url)));
+    }
     const fingerprintParts = [ctx.sequenceContext.seedHash, ctx.sequenceContext.assignmentHash];
     const sample = {
       sessionId,
@@ -127,18 +140,16 @@ function setEquals(actual, expected) {
       }
 
       for (const url of targetSet) {
-        if (!targetCatalog.has(url)) summary.catalogCoverageViolations += 1;
+        if (!catalogUrls.has(url)) summary.catalogCoverageViolations += 1;
         if (seenAcrossLevels.has(url)) summary.overlapViolations += 1;
         seenAcrossLevels.add(url);
-        assignedTargets.add(url);
-        if (recordObservations) targetLevelObservations.get(url).add(levelKey);
+        if (recordObservations) allTargets.add(url);
       }
       for (const url of fillerSet) {
-        if (!fillerCatalog.has(url)) summary.catalogCoverageViolations += 1;
+        if (!catalogUrls.has(url)) summary.catalogCoverageViolations += 1;
         if (seenAcrossLevels.has(url)) summary.overlapViolations += 1;
         seenAcrossLevels.add(url);
-        assignedFillers.add(url);
-        if (recordObservations) fillerLevelObservations.get(url).add(levelKey);
+        if (recordObservations) allFillers.add(url);
       }
 
       const built = ctx.buildLevelSequence(levelKey);
@@ -163,14 +174,6 @@ function setEquals(actual, expected) {
         lag => lag < 1 || lag > ctx.vigilanceRepeatMaxGap,
       ).length;
 
-      if (recordObservations) {
-        built.types.forEach((type, index) => {
-          if (type === TARGET) {
-            targetPositionObservations.get(built.sequence[index]).add(`${levelKey}:${index}`);
-          }
-        });
-      }
-
       fingerprintParts.push(
         levelKey,
         level.targets.join(','),
@@ -188,7 +191,7 @@ function setEquals(actual, expected) {
       };
     }
 
-    if (!setEquals(assignedTargets, targetCatalog) || !setEquals(assignedFillers, fillerCatalog)) {
+    if (seenAcrossLevels.size !== 17 + 196) {
       summary.catalogCoverageViolations += 1;
     }
     sample.sessionSequenceHash = ctx.hashHex(fingerprintParts.join('||'));
@@ -218,16 +221,14 @@ function setEquals(actual, expected) {
   }
 
   summary.uniqueSessionSequenceHashes = sessionHashes.size;
-  summary.targetLevelVariationViolations = [...targetLevelObservations.values()].filter(set => set.size < 2).length;
-  summary.fillerLevelVariationViolations = [...fillerLevelObservations.values()].filter(set => set.size < 2).length;
-  summary.targetPositionVariationViolations = [...targetPositionObservations.values()].filter(set => set.size < 2).length;
+  summary.imagesSampledAsTargets = allTargets.size;
+  summary.imagesSampledAsFillers = allFillers.size;
+  summary.imagesSampledInBothRoles = [...allTargets].filter(url => allFillers.has(url)).length;
 
   const zeroFields = [
     'duplicateSessionSequenceHashes',
     'sameSessionReproductionMismatches',
-    'targetLevelVariationViolations',
-    'fillerLevelVariationViolations',
-    'targetPositionVariationViolations',
+    'stratificationViolations',
     'catalogCoverageViolations',
     'roleCountViolations',
     'overlapViolations',
@@ -240,7 +241,6 @@ function setEquals(actual, expected) {
     summary.uniqueSessionSequenceHashes === SESSION_COUNT &&
     zeroFields.every(field => summary[field] === 0);
 
-  fs.writeFileSync(path.join(base, 'reports/step3_constraints.json'), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.allChecksPassed) process.exitCode = 1;
 })();

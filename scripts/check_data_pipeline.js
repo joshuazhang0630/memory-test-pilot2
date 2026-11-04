@@ -130,7 +130,7 @@ function resetSession() {
   ctx.imtypestring = '';
   ctx.perfstring = '';
   ctx.sequenceContext = {
-    algorithm: 'pilot2-session-sequence-v2',
+    algorithm: 'pilot2-stratified-shared-pool-v1',
     seedInput: 'pipeline-seed-input',
     seedHash: 'a1b2c3d4',
     assignmentHash: 'e5f60718',
@@ -214,7 +214,7 @@ async function main() {
   ctx.devFastMode = true;
   ctx.devPretrainUniqueCount = 2;
   ctx.devPretrainTotalCount = 4;
-  ctx.pretestImages = ['practice-a.png', 'practice-b.png'];
+  ctx.manifestData = { catalog: Array.from({ length: 17 }, (_, index) => ({ url: 'practice-' + index + '.png', stratum: 'practice' })) };
   ctx.buildPretrainSequence();
   assert.deepStrictEqual(Array.from(ctx.pretrainTypeSequence), [1, 1, 2, 2]);
   assert.strictEqual(ctx.pretrainSequence[0], ctx.pretrainSequence[2]);
@@ -265,8 +265,6 @@ async function main() {
   assert(fixationDeadline - imageDeadline >= 1400, 'fixation interval must never be shorter than 1400 ms');
   assert(fixationDeadline - imageDeadline < 1433, 'fixation must advance within two 60 Hz frames');
 
-  assert.strictEqual(ctx.resolveManifestUrl('https://example.test/filler/', 'image.png', 'rev-1'), 'https://example.test/filler/image.png?v=rev-1');
-  assert.strictEqual(ctx.resolveManifestUrl('https://example.test/filler/', 'image.png', ''), 'https://example.test/filler/image.png');
   ctx.devFastMode = false;
 
   setTinyLevel(1, 'level1.png');
@@ -304,14 +302,14 @@ async function main() {
   assert.strictEqual(ctx.trialEventRows[0].false_alarm_flag, 1);
   const trialMeta = JSON.parse(ctx.trialEventRows[0].client_meta_json);
   assert.strictEqual(trialMeta.response_window, 'fixation_grace');
-  assert.strictEqual(trialMeta.sequence_algorithm, 'pilot2-session-sequence-v2');
+  assert.strictEqual(trialMeta.sequence_algorithm, 'pilot2-stratified-shared-pool-v1');
   assert.strictEqual(trialMeta.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(trialMeta.assignment_hash, 'e5f60718');
   assert.strictEqual(trialMeta.level_sequence_hash, '11111111');
   assert.strictEqual(trialMeta.run_mode, 'qa');
   assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v3');
-  assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(trialMeta.client_build_id, 'pilot2-post-questionnaire-v5');
+  assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_shared_targets_1800_v1');
+  assert.strictEqual(trialMeta.client_build_id, 'pilot2-shared-targets-v1');
   assert.strictEqual(trialMeta.stimulus_timing, 'preloaded-double-buffer-raf-deadline-v2');
 
   resetSession();
@@ -411,7 +409,7 @@ async function main() {
   assert.strictEqual(postSurveyMeta.post_raw.hitImageId, renderedHit.imageId);
   assert.strictEqual(postSurveyMeta.post_raw.missImageId, renderedMiss.imageId);
   assert.strictEqual(postSurveyMeta.schema_version, 'pilot2-event-v3');
-  assert.strictEqual(postSurveyMeta.client_build_id, 'pilot2-post-questionnaire-v5');
+  assert.strictEqual(postSurveyMeta.client_build_id, 'pilot2-shared-targets-v1');
 
   resetSession();
   ctx.trialEventRows = Array.from({ length: 240 }, (_, index) => ({
@@ -536,14 +534,14 @@ async function main() {
   assert.strictEqual(summaryRow.post_q7, 'pipeline comments');
   assert.strictEqual(summaryRow.post_q8, 'target-hit-miss-v1');
   const summaryMeta = JSON.parse(summaryRow.client_meta_json);
-  assert.strictEqual(summaryMeta.sequence_algorithm, 'pilot2-session-sequence-v2');
+  assert.strictEqual(summaryMeta.sequence_algorithm, 'pilot2-stratified-shared-pool-v1');
   assert.strictEqual(summaryMeta.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(summaryMeta.assignment_hash, 'e5f60718');
   assert.deepStrictEqual(summaryMeta.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
   assert.strictEqual(summaryMeta.run_mode, 'qa');
   assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v3');
-  assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-post-questionnaire-v5');
+  assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_shared_targets_1800_v1');
+  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-shared-targets-v1');
 
   localData.clear();
   let failedRequests = 0;
@@ -556,14 +554,14 @@ async function main() {
   assert.strictEqual(failedRequests, 3);
   assert(localData.has('pilot2_checkpoint_QA_PIPELINE-session'));
   const checkpoint = JSON.parse(localData.get('pilot2_checkpoint_QA_PIPELINE-session'));
-  assert.strictEqual(checkpoint.sequence_algorithm, 'pilot2-session-sequence-v2');
+  assert.strictEqual(checkpoint.sequence_algorithm, 'pilot2-stratified-shared-pool-v1');
   assert.strictEqual(checkpoint.sequence_seed_hash, 'a1b2c3d4');
   assert.strictEqual(checkpoint.assignment_hash, 'e5f60718');
   assert.deepStrictEqual(checkpoint.level_sequence_hashes, { '1': '11111111', '2': '22222222' });
   assert.strictEqual(checkpoint.run_mode, 'qa');
   assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v3');
-  assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_balanced_targets_v2');
-  assert.strictEqual(checkpoint.client_build_id, 'pilot2-post-questionnaire-v5');
+  assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_shared_targets_1800_v1');
+  assert.strictEqual(checkpoint.client_build_id, 'pilot2-shared-targets-v1');
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');
@@ -579,7 +577,6 @@ async function main() {
       doubleBufferedFrameActivation: true,
       imageDurationAtLeast1000ms: true,
       fixationDurationAtLeast1400ms: true,
-      manifestRevisionCacheBust: true,
       uniqueCrossLevelEventIds: true,
       fixationResponseMappedToImage: true,
       transitionResponseNotDropped: true,
