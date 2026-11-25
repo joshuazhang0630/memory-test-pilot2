@@ -2,7 +2,7 @@ const assert = require('assert');
 const { execFileSync } = require('child_process');
 
 const spreadsheetId = '1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY';
-const appsUrl = 'https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec';
+const appsUrl = 'https://script.google.com/macros/s/AKfycbzuL2lSuQZYa8O4gYD80kZ3-B17I-W_0a6rF1i7Ehrv5p_ZwnAR8XYMdnG4KjtbPIyo7g/exec';
 const tag = `QA_POST_${Date.now()}`;
 const hitImageId = `${tag}_HIT_IMAGE`;
 const missImageId = `${tag}_MISS_IMAGE`;
@@ -38,7 +38,7 @@ const row = {
   user_id: tag,
   participant_id: tag,
   session_id: tag,
-  study_version: 'pilot2-v1',
+  study_version: 'pilot2-balanced-slots-v1',
   level_index: 2,
   trial_index: '',
   image_id: '',
@@ -69,8 +69,10 @@ const row = {
   client_meta_json: JSON.stringify({
     run_mode: 'qa',
     schema_version: 'pilot2-event-v3',
-    stimulus_catalog_version: 'pilot2_balanced_targets_v2',
-    client_build_id: 'pilot2-post-questionnaire-v5',
+    stimulus_catalog_version: 'pilot2_shared_targets_1800_v1',
+    client_build_id: 'pilot2-balanced-slots-v1',
+    slot_id: '',
+    plan_version: '',
     post_raw: postRaw,
   }),
 };
@@ -126,7 +128,7 @@ async function main() {
   const writtenMeta = JSON.parse(written.client_meta_json);
   assert.deepStrictEqual(writtenMeta.post_raw, postRaw);
   assert.strictEqual(writtenMeta.schema_version, 'pilot2-event-v3');
-  assert.strictEqual(writtenMeta.client_build_id, 'pilot2-post-questionnaire-v5');
+  assert.strictEqual(writtenMeta.client_build_id, 'pilot2-balanced-slots-v1');
 
   console.log(JSON.stringify({
     status: 'PASS',

@@ -2,7 +2,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SID="1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY"
-APPS_URL="https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec"
+APPS_URL="https://script.google.com/macros/s/AKfycbzuL2lSuQZYa8O4gYD80kZ3-B17I-W_0a6rF1i7Ehrv5p_ZwnAR8XYMdnG4KjtbPIyo7g/exec"
 TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 TAG="backend_sheet_smoke_$(date +%s)_${RANDOM}"
 PAYLOAD=$(mktemp)
@@ -70,7 +70,7 @@ with open(path, "w") as f:
     json.dump(payload, f)
 PY
 
-curl -fsS -X POST -H "Content-Type: text/plain;charset=utf-8" --data-binary "@$PAYLOAD" "$APPS_URL" >/tmp/sheet_backend_out.txt
+curl -fsSL -H "Content-Type: text/plain;charset=utf-8" --data-binary "@$PAYLOAD" "$APPS_URL" >/tmp/sheet_backend_out.txt
 sleep 3
 
 RAW=$(gog sheets get "$SID" "raw_events!A:AP" --json)

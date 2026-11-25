@@ -332,8 +332,9 @@ function showInstructions() {
                 in both practice and the primary experiment must be made with the <strong>SPACE BAR</strong>.
             </p>
             <div class="action-row">
-                <button class="primary-button" onclick="startPretrain()">Begin Practice Block</button>
+                <button id="practice-start-button" class="primary-button" onclick="startPretrain()">Begin Practice Block</button>
             </div>
+            <p id="practice-start-status" role="status"></p>
         </section>
     `;
     document.body.innerHTML = renderShell(content);
@@ -350,6 +351,26 @@ function runFastFlow() {
 
 // Start pretrain
 async function startPretrain() {
+	if (!pretrainSequence.length){
+		const button = document.getElementById("practice-start-button");
+		if (button){
+			button.disabled = true;
+			document.getElementById("practice-start-status").textContent = "Preparing your study session…";
+		}
+		try {
+			await requireImagesReady();
+			await reserveTargetSlot(String(pid || ""));
+			buildPretrainSequence();
+		} catch (err){
+			console.error("Could not prepare practice", err);
+			const message = err.message === "target_slots_full"
+				? "All study places are currently allocated."
+				: "We could not prepare your study session. Please try again.";
+			showInstructions();
+			document.getElementById("practice-start-status").textContent = message;
+			return;
+		}
+	}
 	inPretrainMode = true;
 	pretrainImCount = -1;
 	blockAssetsReady = false;
@@ -1232,6 +1253,7 @@ function showFailure(){
 		endingInput.value = endingStatus;
 	}
 	experimentCompleted = true;
+	persistTrialCheckpoint();
 	showPostSurvey();
 }
 
@@ -1616,6 +1638,7 @@ function collectTrialEvent(index){
             schema_version: eventSchemaVersion,
             stimulus_catalog_version: stimulusCatalogVersion,
             client_build_id: clientBuildId,
+            ...targetSlotMetadata(),
             stimulus_timing: "preloaded-double-buffer-raf-deadline-v2",
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
@@ -1662,7 +1685,7 @@ function saveProgress(index){
 }
 
 function finalizeTrialPair(imageIndex, fixationIndex){
+	determineFailure(imageIndex);
 	saveProgress(imageIndex);
 	saveProgress(fixationIndex);
-	determineFailure(imageIndex);
 }

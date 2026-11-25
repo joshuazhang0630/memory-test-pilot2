@@ -9,6 +9,7 @@ async function loadStimulusCatalog(){
     }
     const images = catalog.images.map(function(record){
         return {
+            filename: record.filename,
             url: catalog.baseUrl + encodeURIComponent(record.filename),
             stratum: record.stratum
         };
@@ -95,9 +96,77 @@ function makeStratifiedSampler(records, rng){
     };
 }
 
+function usesTargetSlot(participantId){
+    return !devFastMode && !/^QA_/.test(String(participantId || ""));
+}
+
+async function reserveTargetSlot(participantId){
+    if (!usesTargetSlot(participantId) ||
+        (activeTargetSlot && activeTargetSlot.participantId === participantId)){
+        return;
+    }
+    if (!participantId){
+        throw new Error("missing_participant_id");
+    }
+    var controller = new AbortController();
+    var timeout = setTimeout(function(){ controller.abort(); }, 20000);
+    var response;
+    try {
+        response = await postPayload(sheetAppsUrl, {
+            action: "claim_target_slot",
+            participant_id: participantId,
+            plan_version: studyVersion,
+            catalog_version: stimulusCatalogVersion
+        }, controller.signal);
+    } finally {
+        clearTimeout(timeout);
+    }
+    var urlsByFilename = new Map(manifestData.catalog.map(function(record){
+        return [record.filename, record.url];
+    }));
+    if (response.plan_version !== studyVersion || response.catalog_version !== stimulusCatalogVersion ||
+        typeof response.slot_id !== "string" || !response.slot_id ||
+        !Array.isArray(response.targets) || response.targets.length !== activeLevelCount ||
+        !response.targets.every(function(level){ return Array.isArray(level) && level.length === 16; })){
+        throw new Error("invalid_target_slot");
+    }
+    var levels = response.targets.map(function(level){
+        return level.map(function(filename){ return urlsByFilename.get(filename); });
+    });
+    var targets = levels.flat();
+    if (targets.some(function(url){ return !url; }) || new Set(targets).size !== targets.length){
+        throw new Error("invalid_target_slot_images");
+    }
+    activeTargetSlot = {
+        participantId: participantId,
+        slotId: response.slot_id,
+        planVersion: response.plan_version,
+        levels: levels
+    };
+}
+
+function targetSlotForParticipant(participantId){
+    if (!usesTargetSlot(participantId)){
+        return null;
+    }
+    if (!activeTargetSlot || activeTargetSlot.participantId !== participantId){
+        throw new Error("target_slot_required");
+    }
+    return activeTargetSlot;
+}
+
+function targetSlotMetadata(){
+    var slot = usesTargetSlot(pid) && activeTargetSlot && activeTargetSlot.participantId === pid
+        ? activeTargetSlot : null;
+    return { slot_id: slot ? slot.slotId : "", plan_version: slot ? slot.planVersion : "" };
+}
+
 function practiceImagesForSession(participantId, sessionId){
     var rng = makeSeededRng(hashString(stimulusCatalogVersion + "|practice|" + participantId + "|" + sessionId));
-    return makeStratifiedSampler(manifestData.catalog, rng)(17);
+    var slot = targetSlotForParticipant(participantId);
+    var targets = new Set(slot ? slot.levels.flat() : []);
+    var pool = manifestData.catalog.filter(function(record){ return !targets.has(record.url); });
+    return makeStratifiedSampler(pool, rng)(17);
 }
 
 function initializeParticipantLevels(participantId, sessionId){
@@ -112,12 +181,14 @@ function initializeParticipantLevels(participantId, sessionId){
 
     var normalizedParticipantId = String(participantId || "anon");
     var normalizedSessionId = String(sessionId || currentSessionId || (normalizedParticipantId + "-session"));
+    var slot = targetSlotForParticipant(normalizedParticipantId);
     var seedInput = [
         sequenceAlgorithm,
         studyVersion || "pilot2-v1",
         studySalt || "salt",
         normalizedParticipantId,
-        normalizedSessionId
+        normalizedSessionId,
+        slot ? slot.slotId : ""
     ].join("|");
     sequenceContext = {
         algorithm: sequenceAlgorithm,
@@ -128,8 +199,9 @@ function initializeParticipantLevels(participantId, sessionId){
     };
 
     var practiceUrls = new Set(practiceImagesForSession(normalizedParticipantId, normalizedSessionId));
+    var targetUrls = new Set(slot ? slot.levels.flat() : []);
     var formalPool = manifestData.catalog.filter(function(record){
-        return !practiceUrls.has(record.url);
+        return !practiceUrls.has(record.url) && !targetUrls.has(record.url);
     });
     var draw = makeStratifiedSampler(formalPool, makeSequenceRng("shared-pool"));
 
@@ -151,8 +223,8 @@ function initializeParticipantLevels(participantId, sessionId){
     var fillerSinglesPerLevel = Math.max(0, effectiveLevelTrialCount - (targetPairsPerLevel * 2) - (vigilancePairsPerLevel * 2));
 
     var levels = {};
-    levelKeys.forEach(function(levelKey){
-        levels[levelKey] = { targets: draw(targetPairsPerLevel) };
+    levelKeys.forEach(function(levelKey, index){
+        levels[levelKey] = { targets: slot ? slot.levels[index].slice() : draw(targetPairsPerLevel) };
     });
     levelKeys.forEach(function(levelKey){
         var level = levels[levelKey];

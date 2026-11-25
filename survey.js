@@ -23,7 +23,7 @@ async function showPreSurvey(){
                     </div>
                     <div class="form-element" id="pcid-container">
                         <span class="prompt-text spaced-right "><span style="color: #0099CC">*</span> Please provide your participant ID:</span>
-                        <input type="text" id="pcid" name="participant_id" required>
+                        <input type="text" id="pcid" name="participant_id" maxlength="200" required>
                     </div>
                     <div class="form-element" id="retake-container">
                         <span class="prompt-text" style="color: #0099CC">* </span>
@@ -140,10 +140,12 @@ async function showPreSurvey(){
                 return;
             }
             updateGenderValidity();
+            var participantInput = document.getElementById("pcid");
+            participantInput.value = participantInput.value.trim();
             if (!preForm.reportValidity()){
                 return;
             }
-            pid = (document.getElementById("pcid").value || "").trim();
+            pid = participantInput.value;
             preSurveyResponses.workerId = pid;
             preSurveyResponses.takenBefore = document.getElementById("retake").value;
             preSurveyResponses.gender = genderSelections.join("|");
@@ -156,7 +158,6 @@ async function showPreSurvey(){
             preSurveyResponses.complexityImageA = "";
             preSurveyResponses.complexityImageB = "";
 
-            buildPretrainSequence();
             showInstructions();
         };
     }
@@ -249,6 +250,7 @@ function persistTrialCheckpoint(syncRemote){
             schema_version: eventSchemaVersion,
             stimulus_catalog_version: stimulusCatalogVersion,
             client_build_id: clientBuildId,
+            ...targetSlotMetadata(),
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
             assignment_hash: sequenceContext.assignmentHash || "",
@@ -282,20 +284,21 @@ function validateRows(rows){
     return { ok: true };
 }
 
-async function postPayload(appsURL, payload){
+async function postPayload(appsURL, payload, signal){
     var response = await fetch(appsURL, {
         method: "POST",
         mode: "cors",
         redirect: "follow",
         headers: {"Content-Type": "text/plain;charset=utf-8"},
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: signal
     });
     if (!response.ok){
         throw new Error("sheet_http_" + response.status);
     }
     var result = await response.json();
     if (!result || result.ok !== true){
-        throw new Error("sheet_rejected_payload");
+        throw new Error((result && result.code) || "sheet_rejected_payload");
     }
     if (Array.isArray(payload.rows)){
         var received = Number(result.received);
@@ -398,6 +401,7 @@ async function sendToSheets() {
             schema_version: eventSchemaVersion,
             stimulus_catalog_version: stimulusCatalogVersion,
             client_build_id: clientBuildId,
+            ...targetSlotMetadata(),
             gender_self: preSurveyResponses.genderSelf || ""
         }));
         return merged;
@@ -456,6 +460,7 @@ async function sendToSheets() {
             schema_version: eventSchemaVersion,
             stimulus_catalog_version: stimulusCatalogVersion,
             client_build_id: clientBuildId,
+            ...targetSlotMetadata(),
             sequence_algorithm: sequenceContext.algorithm || sequenceAlgorithm || "",
             sequence_seed_hash: sequenceContext.seedHash || "",
             assignment_hash: sequenceContext.assignmentHash || "",

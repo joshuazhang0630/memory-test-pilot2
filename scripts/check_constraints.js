@@ -201,7 +201,7 @@ function calcLags(sequence, types) {
     return { fingerprint: fingerprintParts.join('||'), hash: sample.sessionSequenceHash, sample };
   }
 
-  const participantId = 'synthetic-login-user';
+  const participantId = 'QA_SYNTHETIC';
   for (let index = 0; index < SESSION_COUNT; index += 1) {
     const sessionId = `${participantId}-login-${String(index + 1).padStart(3, '0')}`;
     try {

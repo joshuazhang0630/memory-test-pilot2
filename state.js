@@ -59,9 +59,9 @@ Additional 2024 updates:
 
 var fixation_address = "https://www.wilmabainbridge.com/datasets/memorabilitycollector/fixation.jpg";
 var stimulusCatalogUrl = "./stimulus-catalog.json";
-var studyVersion = "pilot2-shared-targets-v1";
+var studyVersion = "pilot2-balanced-slots-v1";
 var studySalt = "pilot2-session-randomized-v2";
-var sequenceAlgorithm = "pilot2-stratified-shared-pool-v1";
+var sequenceAlgorithm = "pilot2-balanced-target-slots-v1";
 var sequenceContext = {
     algorithm: sequenceAlgorithm,
     seedInput: "",
@@ -70,6 +70,7 @@ var sequenceContext = {
     levelSequenceHashes: {}
 };
 var activeLevelCount = 5;
+var activeTargetSlot = null;
 var images = [];
 var allImagesCatalog = [];
 var imageLoadPromise = null;
@@ -199,15 +200,15 @@ var activeStimulusElementId = "stimulus";
 var savedProgressKeys = {};
 var vigilanceHistory = [];
 var submissionInProgress = false;
-var sheetAppsUrl = "https://script.google.com/macros/s/AKfycbxy8Li7LKoIZK30w0ivOeQUqfmWTBWWLfMxBqByQjlWCAkJJPYucQLh7Pp0Vc_Pa3I1jg/exec";
+var sheetAppsUrl = "https://script.google.com/macros/s/AKfycbzuL2lSuQZYa8O4gYD80kZ3-B17I-W_0a6rF1i7Ehrv5p_ZwnAR8XYMdnG4KjtbPIyo7g/exec";
 var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
 var sheetWorksheetName = "raw_events";
 var eventSchemaVersion = "pilot2-event-v3";
 var stimulusCatalogVersion = "pilot2_shared_targets_1800_v1";
-var clientBuildId = "pilot2-five-levels-v1";
+var clientBuildId = "pilot2-balanced-slots-v1";
 
 function currentRunMode(){
-    return /^QA_/.test(String(pid || "")) ? "qa" : "production";
+    return devFastMode || /^QA_/.test(String(pid || "")) ? "qa" : "production";
 }
 
 // Dev/test helpers (set in console)
