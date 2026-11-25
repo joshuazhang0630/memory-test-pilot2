@@ -85,6 +85,9 @@ function calcLags(sequence, types) {
     ctx.initializeParticipantLevels(participantId, sessionId);
     const levels = ctx.manifestData.levels;
     const levelKeys = Object.keys(levels).sort();
+    if (levelKeys.length !== 5 || levelKeys.join(',') !== '1,2,3,4,5') {
+      summary.roleCountViolations += 1;
+    }
     const practice = ctx.practiceImagesForSession(participantId, sessionId);
     const seenAcrossLevels = new Set(practice);
     if (seenAcrossLevels.size !== 17 || !practice.every(url => catalogUrls.has(url))) {
@@ -191,7 +194,7 @@ function calcLags(sequence, types) {
       };
     }
 
-    if (seenAcrossLevels.size !== 17 + 196) {
+    if (seenAcrossLevels.size !== 17 + 5 * 98) {
       summary.catalogCoverageViolations += 1;
     }
     sample.sessionSequenceHash = ctx.hashHex(fingerprintParts.join('||'));

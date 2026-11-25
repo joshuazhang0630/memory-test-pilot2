@@ -309,7 +309,7 @@ async function main() {
   assert.strictEqual(trialMeta.run_mode, 'qa');
   assert.strictEqual(trialMeta.schema_version, 'pilot2-event-v3');
   assert.strictEqual(trialMeta.stimulus_catalog_version, 'pilot2_shared_targets_1800_v1');
-  assert.strictEqual(trialMeta.client_build_id, 'pilot2-shared-targets-v1');
+  assert.strictEqual(trialMeta.client_build_id, 'pilot2-five-levels-v1');
   assert.strictEqual(trialMeta.stimulus_timing, 'preloaded-double-buffer-raf-deadline-v2');
 
   resetSession();
@@ -409,7 +409,7 @@ async function main() {
   assert.strictEqual(postSurveyMeta.post_raw.hitImageId, renderedHit.imageId);
   assert.strictEqual(postSurveyMeta.post_raw.missImageId, renderedMiss.imageId);
   assert.strictEqual(postSurveyMeta.schema_version, 'pilot2-event-v3');
-  assert.strictEqual(postSurveyMeta.client_build_id, 'pilot2-shared-targets-v1');
+  assert.strictEqual(postSurveyMeta.client_build_id, 'pilot2-five-levels-v1');
 
   resetSession();
   ctx.trialEventRows = Array.from({ length: 240 }, (_, index) => ({
@@ -541,7 +541,7 @@ async function main() {
   assert.strictEqual(summaryMeta.run_mode, 'qa');
   assert.strictEqual(summaryMeta.schema_version, 'pilot2-event-v3');
   assert.strictEqual(summaryMeta.stimulus_catalog_version, 'pilot2_shared_targets_1800_v1');
-  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-shared-targets-v1');
+  assert.strictEqual(summaryMeta.client_build_id, 'pilot2-five-levels-v1');
 
   localData.clear();
   let failedRequests = 0;
@@ -561,7 +561,7 @@ async function main() {
   assert.strictEqual(checkpoint.run_mode, 'qa');
   assert.strictEqual(checkpoint.schema_version, 'pilot2-event-v3');
   assert.strictEqual(checkpoint.stimulus_catalog_version, 'pilot2_shared_targets_1800_v1');
-  assert.strictEqual(checkpoint.client_build_id, 'pilot2-shared-targets-v1');
+  assert.strictEqual(checkpoint.client_build_id, 'pilot2-five-levels-v1');
 
   const experimentSource = fs.readFileSync(path.join(base, 'experiment.js'), 'utf8');
   assert(!experimentSource.includes('addEventListener("click", handlePostSubmit)'), 'submit must have one handler');

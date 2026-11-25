@@ -69,7 +69,7 @@ var sequenceContext = {
     assignmentHash: "",
     levelSequenceHashes: {}
 };
-var activeLevelCount = 2;
+var activeLevelCount = 5;
 var images = [];
 var allImagesCatalog = [];
 var imageLoadPromise = null;
@@ -204,7 +204,7 @@ var sheetSpreadsheetId = "1i6SZGswHCEZjhYgxzQae5jjQDFowSl7jnA0IwYYcDVY";
 var sheetWorksheetName = "raw_events";
 var eventSchemaVersion = "pilot2-event-v3";
 var stimulusCatalogVersion = "pilot2_shared_targets_1800_v1";
-var clientBuildId = "pilot2-shared-targets-v1";
+var clientBuildId = "pilot2-five-levels-v1";
 
 function currentRunMode(){
     return /^QA_/.test(String(pid || "")) ? "qa" : "production";

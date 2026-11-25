@@ -73,9 +73,9 @@ This verifies cross-level sequence separators and event IDs, unique-image preloa
 
 - Run `node scripts/check_constraints.js`.
 
-This builds 200 synthetic sessions and replays each seed. It verifies the 1,800-image catalog, proportional stratum quotas, and disjoint practice and formal assignments. Each level still has 16 targets, 6 vigilance images, 76 single fillers, 120 presentations, target lag 91–109, and vigilance lag 1–7.
+This builds 200 synthetic sessions and replays each seed. It verifies the 1,800-image catalog, proportional stratum quotas, and disjoint practice and formal assignments across all five levels (490 unique formal images plus 17 practice images). Each level still has 16 targets, 6 vigilance images, 76 single fillers, 120 presentations, target lag 91–109, and vigilance lag 1–7.
 
-All roles draw without replacement from the shared catalog. Practice reserves 17 images for the session and reshuffles their presentation order on retries. Those images are excluded from both formal levels.
+All roles draw without replacement from the shared catalog. Practice reserves 17 images for the session and reshuffles their presentation order on retries. Those images are excluded from all five formal levels.
 
 ## Notes
 
